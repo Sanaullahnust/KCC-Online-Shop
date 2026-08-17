@@ -77,7 +77,9 @@ import {
   RefreshCw,
   Layers,
   UploadCloud,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { useState, useEffect, useMemo, MouseEvent, FormEvent } from "react";
 import { 
@@ -111,6 +113,8 @@ import { ShippingPolicyPage } from "./components/ShippingPolicyPage";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { BulkProductCsvModal } from "./components/BulkProductCsvModal";
 import { ProductUrlImporterModal } from "./components/ProductUrlImporterModal";
+import { WhatsAppProductExtractorModal } from "./components/WhatsAppProductExtractorModal";
+import { BulkWhatsAppMessagingModal } from "./components/BulkWhatsAppMessagingModal";
 import { ProductVariant } from "./lib/commerceApi";
 import { compressAndResizeImage, formatBytes, compressDataUrl } from "./lib/imageCompressor";
 import { downloadWordPressThemeZip } from "./lib/wordpressThemeGenerator";
@@ -400,7 +404,9 @@ export default function App() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
   const [contactSubmissionSearch, setContactSubmissionSearch] = useState('');
-  const [contactSubmissionStatusFilter, setContactSubmissionStatusFilter] = useState<'all' | 'unread' | 'read' | 'replied'>('all');
+  const [contactSubmissionStatusFilter, setContactSubmissionStatusFilter] = useState<'all' | 'unread' | 'read' | 'replied' | 'in-transit' | 'pending-dispatch'>('all');
+  const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<string[]>([]);
+  const [isBulkWhatsAppModalOpen, setIsBulkWhatsAppModalOpen] = useState(false);
 
   // WhatsApp Order & Tracking Generator State
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
@@ -467,6 +473,17 @@ export default function App() {
   // Bulk CSV Upload & URL Product Importer Modals
   const [isBulkCsvModalOpen, setIsBulkCsvModalOpen] = useState(false);
   const [isUrlImporterModalOpen, setIsUrlImporterModalOpen] = useState(false);
+  const [isWhatsAppExtractorModalOpen, setIsWhatsAppExtractorModalOpen] = useState(false);
+
+  // Admin Product Catalog Multi-Selection & View Mode State
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [adminProductViewMode, setAdminProductViewMode] = useState<'grid' | 'table'>('grid');
+  const [productDeleteModalState, setProductDeleteModalState] = useState<{
+    isOpen: boolean;
+    type: 'single' | 'selected' | 'all';
+    targetProduct?: Product;
+    count?: number;
+  }>({ isOpen: false, type: 'selected' });
 
   // Dropshipping Integration State
   const [dropshipSubTab, setDropshipSubTab] = useState<'presets' | 'extractor' | 'suppliers' | 'rfq' | 'orders' | 'settings'>('presets');
@@ -828,11 +845,128 @@ export default function App() {
       return;
     }
     const targetProduct = products.find(p => p.id === productId);
-    if (window.confirm(`Are you sure you want to delete "${targetProduct?.name || 'this product'}"?`)) {
-      const updated = products.filter(p => p.id !== productId);
-      setProducts(updated);
-      showToast("Product removed from catalog.", "remove");
+    if (targetProduct) {
+      setProductDeleteModalState({
+        isOpen: true,
+        type: 'single',
+        targetProduct
+      });
     }
+  };
+
+  // Toggle selection for a single product
+  const handleToggleSelectProduct = (productId: string) => {
+    setSelectedProductIds(prev =>
+      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+    );
+  };
+
+  // Toggle select all filtered products in Admin Catalog
+  const handleToggleSelectAllFilteredProducts = (filteredList: Product[]) => {
+    const filteredIds = filteredList.map(p => p.id);
+    const areAllSelected = filteredIds.length > 0 && filteredIds.every(id => selectedProductIds.includes(id));
+
+    if (areAllSelected) {
+      const filteredSet = new Set(filteredIds);
+      setSelectedProductIds(prev => prev.filter(id => !filteredSet.has(id)));
+    } else {
+      setSelectedProductIds(prev => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  // Execute deletion of selected products
+  const handleConfirmDeleteSelectedProducts = () => {
+    if (selectedProductIds.length === 0) return;
+    const count = selectedProductIds.length;
+    const selectedSet = new Set(selectedProductIds);
+    setProducts(prev => prev.filter(p => !selectedSet.has(p.id)));
+    setSelectedProductIds([]);
+    setProductDeleteModalState({ isOpen: false, type: 'selected' });
+    showToast(`Successfully deleted ${count} product(s) from catalog.`, 'remove');
+  };
+
+  // Execute deletion of single product
+  const handleConfirmDeleteSingleProduct = (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    setSelectedProductIds(prev => prev.filter(id => id !== productId));
+    setProductDeleteModalState({ isOpen: false, type: 'single' });
+    showToast('Product removed from catalog.', 'remove');
+  };
+
+  // Execute complete catalog wipe / deletion
+  const handleConfirmClearCompleteCatalog = () => {
+    const count = products.length;
+    setProducts([]);
+    setSelectedProductIds([]);
+    try {
+      localStorage.setItem('kcc_products_v3', JSON.stringify([]));
+    } catch (e) {
+      console.error(e);
+    }
+    setProductDeleteModalState({ isOpen: false, type: 'all' });
+    showToast(`Complete catalog cleared (${count} products deleted). Upload a CSV or reset to defaults.`, 'info');
+  };
+
+  // Bulk mark selected products as Top Sellers or normal
+  const handleBulkToggleTopSeller = (isTop: boolean) => {
+    if (selectedProductIds.length === 0) return;
+    const selectedSet = new Set(selectedProductIds);
+    setProducts(prev => prev.map(p => selectedSet.has(p.id) ? { ...p, isTopSeller: isTop } : p));
+    showToast(`Updated ${selectedProductIds.length} product(s) top seller status.`, 'success');
+  };
+
+  // Bulk update category of selected products
+  const handleBulkChangeCategory = (newCategory: 'Home Improvement' | 'Gadgets' | 'Kitchen') => {
+    if (selectedProductIds.length === 0) return;
+    const selectedSet = new Set(selectedProductIds);
+    setProducts(prev => prev.map(p => selectedSet.has(p.id) ? { ...p, category: newCategory } : p));
+    showToast(`Moved ${selectedProductIds.length} product(s) to "${newCategory}".`, 'success');
+  };
+
+  // Export any list of products to formatted CSV
+  const handleExportProductsCsv = (productsToExport: Product[], filenameLabel = 'catalog') => {
+    if (productsToExport.length === 0) {
+      showToast('No products available to export.', 'info');
+      return;
+    }
+
+    const headers = [
+      'Name',
+      'Price',
+      'Category',
+      'Weight',
+      'Description',
+      'Image URL',
+      'Additional Images',
+      'Rating',
+      'Is Top Seller',
+      'Discount Note'
+    ];
+
+    const rows = productsToExport.map(p => [
+      `"${p.name.replace(/"/g, '""')}"`,
+      p.price,
+      `"${p.category}"`,
+      p.weight,
+      `"${p.description.replace(/"/g, '""')}"`,
+      `"${p.image}"`,
+      `"${(p.images || []).join(';')}"`,
+      p.rating,
+      p.isTopSeller ? 'TRUE' : 'FALSE',
+      `"${p.discountNote || 'Discount On Quantity'}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `kcc_${filenameLabel}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${productsToExport.length} product(s) to CSV!`, 'success');
   };
 
   useEffect(() => {
@@ -2026,49 +2160,54 @@ export default function App() {
 
                   {/* Products Management List */}
                   <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-xl border border-black/5">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b pb-6">
+                    {/* Header with Title and Main Actions */}
+                    <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 mb-6 border-b pb-6">
                       <div>
-                        <h2 className="text-2xl font-display font-bold text-brand-dark">Product Catalog</h2>
-                        <p className="text-xs text-brand-gray mt-1">Manage your store inventory, edit prices, upload photos/videos, or mark items as Top Sellers.</p>
+                        <div className="flex items-center gap-2.5">
+                          <h2 className="text-2xl font-display font-bold text-brand-dark">Product Catalog</h2>
+                          <span className="px-2.5 py-0.5 rounded-full bg-brand-light text-brand-dark font-extrabold text-xs">
+                            {products.length} Products
+                          </span>
+                        </div>
+                        <p className="text-xs text-brand-gray mt-1">
+                          Manage store inventory, upload CSV spreadsheets, delete single or multiple items at once, or wipe entire catalog.
+                        </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-3 items-center">
-                        <div className="relative">
-                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gray" size={16} />
-                          <input 
-                            type="text" 
-                            placeholder="Search catalog..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-brand-light border border-black/10 rounded-xl py-2.5 pl-10 pr-4 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-primary/20 w-48 md:w-64"
-                          />
-                        </div>
-                        
-                        <select 
-                          value={selectedCategory}
-                          onChange={(e) => setSelectedCategory(e.target.value as any)}
-                          className="bg-brand-light border border-black/10 rounded-xl py-2.5 px-3 text-xs font-bold outline-none cursor-pointer"
-                        >
-                          <option value="All">All Categories</option>
-                          <option value="Home Improvement">Home Improvement</option>
-                          <option value="Gadgets">Gadgets</option>
-                          <option value="Kitchen">Kitchen</option>
-                        </select>
-
+                      {/* Top Action Buttons */}
+                      <div className="flex flex-wrap gap-2.5 items-center">
                         <button 
                           onClick={() => setIsBulkCsvModalOpen(true)}
-                          className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                          title="Upload multiple products via CSV spreadsheet"
+                          className="bg-zinc-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          title="Upload multiple products via CSV spreadsheet or export backup"
                         >
-                          <FileSpreadsheet size={14} /> Bulk CSV Upload
+                          <FileSpreadsheet size={15} className="text-emerald-400" />
+                          <span>Bulk CSV Upload</span>
+                        </button>
+
+                        <button 
+                          onClick={() => handleExportProductsCsv(products, 'full_catalog')}
+                          disabled={products.length === 0}
+                          className="bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-800 border border-emerald-600/30 px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                          title="Export all store products to CSV spreadsheet"
+                        >
+                          <Download size={14} /> Export CSV
+                        </button>
+
+                        <button 
+                          onClick={() => setIsWhatsAppExtractorModalOpen(true)}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          title="Extract product photos, videos, and specs from WhatsApp groups"
+                        >
+                          <MessageCircle size={14} className="fill-white/20" /> WhatsApp Extractor
                         </button>
 
                         <button 
                           onClick={() => setIsUrlImporterModalOpen(true)}
-                          className="bg-zinc-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          className="bg-zinc-800 hover:bg-zinc-900 text-white px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
                           title="Import from Alibaba, AliExpress, or HHC Dropshipping URL"
                         >
-                          <Globe size={14} className="text-amber-400" /> Import from URL / HHC
+                          <Globe size={14} className="text-amber-400" /> URL / HHC
                         </button>
 
                         <button 
@@ -2077,69 +2216,414 @@ export default function App() {
                         >
                           <PlusCircle size={14} /> + New Product
                         </button>
+
+                        {/* Complete Catalog Deletion Button */}
+                        <button
+                          onClick={() => setProductDeleteModalState({ isOpen: true, type: 'all', count: products.length })}
+                          disabled={products.length === 0}
+                          className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                          title="Delete all products from store or clear complete CSV dataset"
+                        >
+                          <Trash2 size={14} /> Delete All ({products.length})
+                        </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {filteredProducts.map((product) => (
-                        <div 
-                          key={product.id}
-                          className="bg-brand-light/30 border border-black/10 rounded-2xl p-5 flex flex-col justify-between hover:border-brand-primary/40 transition-all shadow-sm group"
+                    {/* Filter & View Mode Controls Bar */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 bg-brand-light/40 p-4 rounded-2xl border border-black/5">
+                      <div className="flex flex-wrap items-center gap-3">
+                        {/* Search Input */}
+                        <div className="relative">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gray" size={15} />
+                          <input 
+                            type="text" 
+                            placeholder="Search catalog by name, price..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-white border border-black/10 rounded-xl py-2 pl-9 pr-3 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-primary/20 w-48 md:w-60 shadow-xs"
+                          />
+                        </div>
+                        
+                        {/* Category Dropdown */}
+                        <select 
+                          value={selectedCategory}
+                          onChange={(e) => setSelectedCategory(e.target.value as any)}
+                          className="bg-white border border-black/10 rounded-xl py-2 px-3 text-xs font-bold outline-none cursor-pointer shadow-xs"
                         >
+                          <option value="All">All Categories ({products.length})</option>
+                          <option value="Home Improvement">Home Improvement ({products.filter(p => p.category === 'Home Improvement').length})</option>
+                          <option value="Gadgets">Gadgets ({products.filter(p => p.category === 'Gadgets').length})</option>
+                          <option value="Kitchen">Kitchen ({products.filter(p => p.category === 'Kitchen').length})</option>
+                        </select>
+
+                        {/* Quick Select Checkbox / Count */}
+                        <button
+                          onClick={() => handleToggleSelectAllFilteredProducts(filteredProducts)}
+                          className="px-3 py-2 bg-white hover:bg-black/5 border border-black/10 rounded-xl text-xs font-bold text-brand-dark flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                          title="Select or deselect all currently filtered products"
+                        >
+                          {filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.includes(p.id)) ? (
+                            <CheckSquare size={15} className="text-indigo-600" />
+                          ) : (
+                            <Square size={15} className="text-brand-gray" />
+                          )}
+                          <span>
+                            {filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.includes(p.id))
+                              ? 'Deselect All'
+                              : `Select Filtered (${filteredProducts.length})`}
+                          </span>
+                        </button>
+
+                        {selectedProductIds.length > 0 && (
+                          <button
+                            onClick={() => setSelectedProductIds([])}
+                            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Clear Selection
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Grid vs Table View Mode Switcher */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold text-brand-gray uppercase tracking-wider">View:</span>
+                        <div className="flex items-center bg-white p-1 rounded-xl border border-black/10 shadow-xs">
+                          <button
+                            onClick={() => setAdminProductViewMode('grid')}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              adminProductViewMode === 'grid'
+                                ? 'bg-zinc-900 text-white shadow-xs'
+                                : 'text-brand-gray hover:text-brand-dark'
+                            }`}
+                            title="Grid Card View"
+                          >
+                            <LayoutGrid size={16} />
+                          </button>
+                          <button
+                            onClick={() => setAdminProductViewMode('table')}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              adminProductViewMode === 'table'
+                                ? 'bg-zinc-900 text-white shadow-xs'
+                                : 'text-brand-gray hover:text-brand-dark'
+                            }`}
+                            title="Dense Spreadsheet Table View"
+                          >
+                            <List size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* MULTI-SELECTION BULK ACTIONS TOOLBAR */}
+                    {selectedProductIds.length > 0 && (
+                      <div className="p-4 mb-6 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-lg border border-indigo-700/40 animate-in fade-in duration-150">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center font-black text-xs shadow-inner">
+                            {selectedProductIds.length}
+                          </div>
                           <div>
-                            <div className="flex gap-4 items-start mb-4">
-                              <div className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-black/10 shrink-0 relative shadow-inner">
-                                <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                                {product.isTopSeller && (
-                                  <span className="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-black uppercase px-1 rounded shadow-sm">
-                                    Top
-                                  </span>
-                                )}
+                            <h4 className="font-bold text-sm text-white">
+                              {selectedProductIds.length} Product(s) Selected for Bulk Actions
+                            </h4>
+                            <p className="text-[11px] text-indigo-200">
+                              Delete multiple products at once, export selected items to CSV, change category, or toggle Top Seller badges.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          {/* Bulk Delete Button */}
+                          <button
+                            onClick={() => setProductDeleteModalState({ isOpen: true, type: 'selected', count: selectedProductIds.length })}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={14} /> Delete Selected ({selectedProductIds.length})
+                          </button>
+
+                          {/* Export Selected as CSV */}
+                          <button
+                            onClick={() => {
+                              const selectedList = products.filter(p => selectedProductIds.includes(p.id));
+                              handleExportProductsCsv(selectedList, `selected_${selectedProductIds.length}_products`);
+                            }}
+                            className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Download size={14} /> Export CSV ({selectedProductIds.length})
+                          </button>
+
+                          {/* Bulk Mark as Top Seller */}
+                          <button
+                            onClick={() => handleBulkToggleTopSeller(true)}
+                            className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Mark selected products as Top Sellers"
+                          >
+                            <Star size={13} className="fill-amber-400 text-amber-400" /> Set Top Seller
+                          </button>
+
+                          {/* Bulk Change Category Dropdown */}
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleBulkChangeCategory(e.target.value as any);
+                                e.target.value = '';
+                              }
+                            }}
+                            defaultValue=""
+                            className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl py-2 px-3 text-xs font-bold outline-none cursor-pointer"
+                          >
+                            <option value="" disabled className="bg-zinc-900 text-white">Bulk Move Category...</option>
+                            <option value="Home Improvement" className="bg-zinc-900 text-white">Move to Home Improvement</option>
+                            <option value="Gadgets" className="bg-zinc-900 text-white">Move to Gadgets</option>
+                            <option value="Kitchen" className="bg-zinc-900 text-white">Move to Kitchen</option>
+                          </select>
+
+                          {/* Deselect All */}
+                          <button
+                            onClick={() => setSelectedProductIds([])}
+                            className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            Deselect
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* VIEW MODE 1: GRID VIEW */}
+                    {adminProductViewMode === 'grid' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredProducts.map((product) => {
+                          const isSelected = selectedProductIds.includes(product.id);
+                          return (
+                            <div 
+                              key={product.id}
+                              className={`bg-brand-light/30 border rounded-2xl p-5 flex flex-col justify-between transition-all shadow-sm group relative ${
+                                isSelected 
+                                  ? 'border-indigo-600 bg-indigo-50/40 ring-2 ring-indigo-500/30' 
+                                  : 'border-black/10 hover:border-brand-primary/40'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex gap-4 items-start mb-4">
+                                  {/* Selection Checkbox & Thumbnail */}
+                                  <div className="relative shrink-0">
+                                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-black/10 relative shadow-inner">
+                                      <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                      {product.isTopSeller && (
+                                        <span className="absolute top-1 left-1 bg-amber-500 text-white text-[8px] font-black uppercase px-1 rounded shadow-sm">
+                                          Top
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    {/* Interactive Checkbox overlay */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleSelectProduct(product.id)}
+                                      className={`absolute -top-2 -left-2 p-1 rounded-lg shadow-md transition-all cursor-pointer ${
+                                        isSelected
+                                          ? 'bg-indigo-600 text-white ring-2 ring-white scale-110'
+                                          : 'bg-white text-brand-gray hover:text-indigo-600 border border-black/10'
+                                      }`}
+                                      title={isSelected ? 'Deselect product' : 'Select product for bulk action'}
+                                    >
+                                      {isSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+                                    </button>
+                                  </div>
+
+                                  <div className="flex-grow min-w-0">
+                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                      <span className="inline-block bg-brand-primary/10 text-brand-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded truncate">
+                                        {product.category}
+                                      </span>
+                                    </div>
+                                    <h3 className="font-bold text-sm text-brand-dark leading-snug line-clamp-2">{product.name}</h3>
+                                    <div className="flex items-center gap-3 mt-2 text-xs">
+                                      <span className="font-display font-black text-brand-primary">Rs.{product.price}</span>
+                                      <span className="text-brand-gray/70">• {product.weight}g</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <p className="text-xs text-brand-gray line-clamp-2 mb-4 italic">"{product.description}"</p>
                               </div>
-                              <div className="flex-grow">
-                                <span className="inline-block bg-brand-primary/10 text-brand-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mb-1">
-                                  {product.category}
-                                </span>
-                                <h3 className="font-bold text-sm text-brand-dark leading-snug line-clamp-2">{product.name}</h3>
-                                <div className="flex items-center gap-3 mt-2 text-xs">
-                                  <span className="font-display font-black text-brand-primary">Rs.{product.price}</span>
-                                  <span className="text-brand-gray/70">• {product.weight}g</span>
+
+                              <div className="pt-3 border-t border-black/5 flex items-center justify-between gap-2">
+                                <button 
+                                  onClick={() => handleToggleTopSeller(product.id)}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 cursor-pointer ${product.isTopSeller ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-600 hover:bg-amber-50'}`}
+                                  title="Toggle Top Seller badge"
+                                >
+                                  <Star size={12} className={product.isTopSeller ? 'fill-amber-500 text-amber-500' : ''} />
+                                  <span>{product.isTopSeller ? 'Top Seller' : 'Make Top'}</span>
+                                </button>
+
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => setEditingProduct(product)}
+                                    className="px-3 py-1.5 bg-brand-primary hover:bg-brand-secondary text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+                                  >
+                                    <Edit3 size={12} /> Edit
+                                  </button>
+                                  <button 
+                                    onClick={(e) => handleDeleteProduct(product.id, e)}
+                                    className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                    title="Delete product"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
                                 </div>
                               </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                            <p className="text-xs text-brand-gray line-clamp-2 mb-4 italic">"{product.description}"</p>
-                          </div>
-
-                          <div className="pt-3 border-t border-black/5 flex items-center justify-between gap-2">
-                            <button 
-                              onClick={() => handleToggleTopSeller(product.id)}
-                              className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${product.isTopSeller ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-gray-100 text-gray-600 hover:bg-amber-50'}`}
-                              title="Toggle Top Seller badge"
-                            >
-                              <Star size={12} className={product.isTopSeller ? 'fill-amber-500 text-amber-500' : ''} />
-                              <span>{product.isTopSeller ? 'Top Seller' : 'Make Top'}</span>
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                              <button 
-                                onClick={() => setEditingProduct(product)}
-                                className="px-3 py-1.5 bg-brand-primary hover:bg-brand-secondary text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1 shadow-sm"
-                              >
-                                <Edit3 size={12} /> Edit
-                              </button>
-                              <button 
-                                onClick={(e) => handleDeleteProduct(product.id, e)}
-                                className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded-lg transition-colors"
-                                title="Delete product"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </div>
+                    {/* VIEW MODE 2: SPREADSHEET TABLE VIEW */}
+                    {adminProductViewMode === 'table' && (
+                      <div className="border border-black/10 rounded-2xl overflow-hidden shadow-xs bg-white">
+                        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-brand-light/90 sticky top-0 z-10 text-[11px] font-extrabold uppercase tracking-wider text-brand-gray border-b border-black/10">
+                              <tr>
+                                <th className="p-3 w-10 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleSelectAllFilteredProducts(filteredProducts)}
+                                    className="text-brand-dark hover:text-indigo-600 transition-colors cursor-pointer"
+                                    title="Select/Deselect all"
+                                  >
+                                    {filteredProducts.length > 0 && filteredProducts.every(p => selectedProductIds.includes(p.id)) ? (
+                                      <CheckSquare size={16} className="text-indigo-600" />
+                                    ) : (
+                                      <Square size={16} />
+                                    )}
+                                  </button>
+                                </th>
+                                <th className="p-3 w-10 text-center">#</th>
+                                <th className="p-3 w-16">Image</th>
+                                <th className="p-3">Product Name & Description</th>
+                                <th className="p-3 w-28">Price (PKR)</th>
+                                <th className="p-3 w-36">Category</th>
+                                <th className="p-3 w-24 text-center">Weight (g)</th>
+                                <th className="p-3 w-24 text-center">Top Seller</th>
+                                <th className="p-3 w-24 text-center">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-black/5">
+                              {filteredProducts.map((product, idx) => {
+                                const isSelected = selectedProductIds.includes(product.id);
+                                return (
+                                  <tr 
+                                    key={product.id}
+                                    className={`hover:bg-brand-light/40 transition-colors ${
+                                      isSelected ? 'bg-indigo-50/60' : ''
+                                    }`}
+                                  >
+                                    <td className="p-3 text-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleSelectProduct(product.id)}
+                                        className="text-brand-gray hover:text-indigo-600 transition-colors cursor-pointer"
+                                      >
+                                        {isSelected ? (
+                                          <CheckSquare size={16} className="text-indigo-600" />
+                                        ) : (
+                                          <Square size={16} />
+                                        )}
+                                      </button>
+                                    </td>
+                                    <td className="p-3 text-center text-brand-gray font-mono font-bold text-[11px]">
+                                      {idx + 1}
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-black/10 shrink-0">
+                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                      </div>
+                                    </td>
+                                    <td className="p-3">
+                                      <h4 className="font-bold text-brand-dark text-xs">{product.name}</h4>
+                                      <p className="text-[11px] text-brand-gray line-clamp-1 italic mt-0.5">{product.description}</p>
+                                    </td>
+                                    <td className="p-3 font-display font-black text-brand-primary">
+                                      Rs.{product.price.toLocaleString()}
+                                    </td>
+                                    <td className="p-3">
+                                      <span className="inline-block bg-brand-primary/10 text-brand-primary text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                                        {product.category}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-center font-bold text-brand-dark">
+                                      {product.weight}g
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <button
+                                        onClick={() => handleToggleTopSeller(product.id)}
+                                        className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                                          product.isTopSeller 
+                                            ? 'text-amber-500 hover:text-amber-600 bg-amber-50' 
+                                            : 'text-gray-400 hover:text-gray-600'
+                                        }`}
+                                        title={product.isTopSeller ? 'Top Seller (click to remove)' : 'Make Top Seller'}
+                                      >
+                                        <Star size={16} className={product.isTopSeller ? 'fill-amber-500' : ''} />
+                                      </button>
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <button
+                                          onClick={() => setEditingProduct(product)}
+                                          className="p-1.5 text-brand-primary hover:bg-brand-primary/10 rounded-lg transition-colors cursor-pointer"
+                                          title="Edit product"
+                                        >
+                                          <Edit3 size={14} />
+                                        </button>
+                                        <button
+                                          onClick={(e) => handleDeleteProduct(product.id, e)}
+                                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                          title="Delete product"
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    )}
+
+                    {/* Empty State */}
+                    {filteredProducts.length === 0 && (
+                      <div className="py-16 text-center">
+                        <div className="bg-brand-light w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-gray">
+                          <Package size={28} />
+                        </div>
+                        <h3 className="text-lg font-bold text-brand-dark mb-1">No products found</h3>
+                        <p className="text-xs text-brand-gray max-w-sm mx-auto mb-4">
+                          {products.length === 0 
+                            ? 'Your store catalog is currently empty. Upload a CSV spreadsheet or add products.' 
+                            : 'No products match your current search and category filters.'}
+                        </p>
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            onClick={() => setIsBulkCsvModalOpen(true)}
+                            className="px-4 py-2 bg-zinc-900 hover:bg-black text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <FileSpreadsheet size={14} /> Upload CSV File
+                          </button>
+                          <button
+                            onClick={handleResetCatalog}
+                            className="px-4 py-2 bg-brand-light hover:bg-black/5 text-brand-dark text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Reset Demo Products
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2502,202 +2986,460 @@ export default function App() {
               )}
 
               {/* TAB 7: Contact Form Messages Inbox (Admin Only) */}
-              {adminTab === 'contact-messages' && (
-                <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-xl border border-black/5 space-y-8">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b pb-6">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-display font-bold text-brand-dark">Contact Form & WhatsApp Orders Inbox</h2>
-                        <span className="px-3 py-1 bg-red-500 text-white font-bold text-xs rounded-full shadow-sm">
-                          {contactSubmissions.filter(m => m.status === 'unread').length} Unread
-                        </span>
+              {adminTab === 'contact-messages' && (() => {
+                // Computed filtered submissions
+                const filteredSubmissions = contactSubmissions.filter(sub => {
+                  if (contactSubmissionStatusFilter === 'unread' && sub.status !== 'unread') return false;
+                  if (contactSubmissionStatusFilter === 'read' && sub.status !== 'read') return false;
+                  if (contactSubmissionStatusFilter === 'replied' && sub.status !== 'replied') return false;
+                  if (contactSubmissionStatusFilter === 'in-transit' && (!sub.trackingNumber && sub.status !== 'replied')) return false;
+                  if (contactSubmissionStatusFilter === 'pending-dispatch' && sub.trackingNumber) return false;
+
+                  if (contactSubmissionSearch) {
+                    const query = contactSubmissionSearch.toLowerCase();
+                    return (
+                      sub.name.toLowerCase().includes(query) ||
+                      sub.emailOrPhone.toLowerCase().includes(query) ||
+                      sub.subject.toLowerCase().includes(query) ||
+                      sub.message.toLowerCase().includes(query) ||
+                      (sub.trackingNumber && sub.trackingNumber.toLowerCase().includes(query)) ||
+                      (sub.courierName && sub.courierName.toLowerCase().includes(query))
+                    );
+                  }
+                  return true;
+                });
+
+                const repliedCount = contactSubmissions.filter(s => s.status === 'replied').length;
+                const inTransitCount = contactSubmissions.filter(s => Boolean(s.trackingNumber) || s.status === 'replied').length;
+                const unreadCount = contactSubmissions.filter(s => s.status === 'unread').length;
+
+                const handleToggleSelectSubmission = (id: string) => {
+                  setSelectedSubmissionIds(prev => 
+                    prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+                  );
+                };
+
+                const handleSelectAllFiltered = () => {
+                  if (filteredSubmissions.length > 0 && filteredSubmissions.every(s => selectedSubmissionIds.includes(s.id))) {
+                    // Deselect all filtered
+                    const filteredIdSet = new Set(filteredSubmissions.map(s => s.id));
+                    setSelectedSubmissionIds(prev => prev.filter(id => !filteredIdSet.has(id)));
+                  } else {
+                    // Select all filtered
+                    const combined = Array.from(new Set([...selectedSubmissionIds, ...filteredSubmissions.map(s => s.id)]));
+                    setSelectedSubmissionIds(combined);
+                  }
+                };
+
+                const handleSelectByStatus = (statusType: 'replied' | 'in-transit' | 'unread') => {
+                  let ids: string[] = [];
+                  if (statusType === 'replied') {
+                    ids = contactSubmissions.filter(s => s.status === 'replied').map(s => s.id);
+                  } else if (statusType === 'in-transit') {
+                    ids = contactSubmissions.filter(s => Boolean(s.trackingNumber) || s.status === 'replied').map(s => s.id);
+                  } else if (statusType === 'unread') {
+                    ids = contactSubmissions.filter(s => s.status === 'unread').map(s => s.id);
+                  }
+                  setSelectedSubmissionIds(ids);
+                  if (ids.length > 0) {
+                    showToast(`Selected ${ids.length} ${statusType} customer messages!`, "info");
+                  } else {
+                    showToast(`No ${statusType} customers found.`, "info");
+                  }
+                };
+
+                const handleBulkGenerateTracking = () => {
+                  if (selectedSubmissionIds.length === 0) return;
+                  const estDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                  let generatedCount = 0;
+                  const updated = contactSubmissions.map(s => {
+                    if (selectedSubmissionIds.includes(s.id)) {
+                      if (!s.trackingNumber) {
+                        generatedCount++;
+                        const trk = generateSimulatedTrackingNumber('TCS Express');
+                        return {
+                          ...s,
+                          trackingNumber: trk,
+                          courierName: 'TCS Express',
+                          estimatedDeliveryDate: estDate,
+                          orderType: s.orderType || 'WhatsApp Order',
+                          status: 'replied' as const
+                        };
+                      }
+                    }
+                    return s;
+                  });
+                  setContactSubmissions(updated);
+                  showToast(`Auto-generated simulated tracking for ${generatedCount} orders!`, "success");
+                };
+
+                const handleBulkMarkReplied = () => {
+                  if (selectedSubmissionIds.length === 0) return;
+                  const updated = contactSubmissions.map(s => 
+                    selectedSubmissionIds.includes(s.id) ? { ...s, status: 'replied' as const } : s
+                  );
+                  setContactSubmissions(updated);
+                  showToast(`Marked ${selectedSubmissionIds.length} submissions as 'Replied'!`, "success");
+                };
+
+                const handleBulkDelete = () => {
+                  if (selectedSubmissionIds.length === 0) return;
+                  if (window.confirm(`Are you sure you want to delete ${selectedSubmissionIds.length} selected submission(s)?`)) {
+                    const updated = contactSubmissions.filter(s => !selectedSubmissionIds.includes(s.id));
+                    setContactSubmissions(updated);
+                    setSelectedSubmissionIds([]);
+                    showToast("Selected submissions deleted.", "remove");
+                  }
+                };
+
+                const handleOpenBulkModalWithSelection = () => {
+                  if (selectedSubmissionIds.length === 0) {
+                    // Pre-select in-transit or replied submissions by default
+                    const targets = inTransitCount > 0 
+                      ? contactSubmissions.filter(s => Boolean(s.trackingNumber) || s.status === 'replied').map(s => s.id)
+                      : contactSubmissions.map(s => s.id);
+                    setSelectedSubmissionIds(targets);
+                  }
+                  setIsBulkWhatsAppModalOpen(true);
+                };
+
+                const isAllFilteredSelected = filteredSubmissions.length > 0 && filteredSubmissions.every(s => selectedSubmissionIds.includes(s.id));
+
+                return (
+                  <div className="bg-white rounded-[2.5rem] p-6 md:p-10 shadow-xl border border-black/5 space-y-6">
+                    {/* Header */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b pb-6">
+                      <div>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <h2 className="text-2xl font-display font-bold text-brand-dark">Contact Form & WhatsApp Orders Inbox</h2>
+                          <span className="px-3 py-1 bg-red-500 text-white font-bold text-xs rounded-full shadow-sm">
+                            {unreadCount} Unread
+                          </span>
+                          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs rounded-full">
+                            {contactSubmissions.length} Total Records
+                          </span>
+                        </div>
+                        <p className="text-xs text-brand-gray mt-1">
+                          Direct customer inquiries & WhatsApp order submissions. Bulk message 'replied' or 'in-transit' customers with personalized tracking updates.
+                        </p>
                       </div>
-                      <p className="text-xs text-brand-gray mt-1">Direct customer inquiries & WhatsApp order submissions. Generate & store simulated tracking numbers for courier dispatches.</p>
-                    </div>
 
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <button 
-                        onClick={() => setShowAddOrderModal(true)}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Plus size={15} /> Log WhatsApp Order
-                      </button>
-
-                      <div className="relative">
-                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gray" size={16} />
-                        <input 
-                          type="text" 
-                          placeholder="Search customer, phone, tracking..." 
-                          value={contactSubmissionSearch}
-                          onChange={(e) => setContactSubmissionSearch(e.target.value)}
-                          className="bg-brand-light border border-black/10 rounded-xl py-2.5 pl-10 pr-4 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-primary/20 w-52 md:w-64"
-                        />
-                      </div>
-
-                      <select 
-                        value={contactSubmissionStatusFilter}
-                        onChange={(e) => setContactSubmissionStatusFilter(e.target.value as any)}
-                        className="bg-brand-light border border-black/10 rounded-xl py-2.5 px-3 text-xs font-bold outline-none cursor-pointer"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="unread">Unread Only</option>
-                        <option value="read">Read Only</option>
-                        <option value="replied">Replied Only</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Messages List */}
-                  <div className="space-y-4">
-                    {contactSubmissions
-                      .filter(sub => {
-                        if (contactSubmissionStatusFilter !== 'all' && sub.status !== contactSubmissionStatusFilter) return false;
-                        if (contactSubmissionSearch) {
-                          const query = contactSubmissionSearch.toLowerCase();
-                          return (
-                            sub.name.toLowerCase().includes(query) ||
-                            sub.emailOrPhone.toLowerCase().includes(query) ||
-                            sub.subject.toLowerCase().includes(query) ||
-                            sub.message.toLowerCase().includes(query) ||
-                            (sub.trackingNumber && sub.trackingNumber.toLowerCase().includes(query)) ||
-                            (sub.courierName && sub.courierName.toLowerCase().includes(query))
-                          );
-                        }
-                        return true;
-                      })
-                      .map((sub) => (
-                        <div 
-                          key={sub.id} 
-                          className={`p-5 rounded-2xl border transition-all hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                            sub.status === 'unread' 
-                              ? 'bg-red-50/50 border-red-200' 
-                              : sub.status === 'replied' 
-                                ? 'bg-emerald-50/30 border-emerald-200' 
-                                : 'bg-brand-light/40 border-black/5'
-                          }`}
+                      <div className="flex flex-wrap gap-2.5 items-center">
+                        {/* Bulk WhatsApp Messaging Modal Trigger Button */}
+                        <button 
+                          onClick={handleOpenBulkModalWithSelection}
+                          className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all cursor-pointer ring-2 ring-emerald-500/20"
+                          title="Open bulk WhatsApp messaging tool for status updates"
                         >
-                          <div className="flex items-start gap-4 flex-grow min-w-0">
-                            <div className={`p-3 rounded-xl flex-shrink-0 ${
-                              sub.status === 'unread' ? 'bg-red-500 text-white' : sub.status === 'replied' ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-brand-dark'
-                            }`}>
-                              <Inbox size={20} />
-                            </div>
-                            <div className="min-w-0 flex-grow space-y-1">
-                              <div className="flex items-center gap-2.5 flex-wrap">
-                                <h4 className="font-bold text-sm md:text-base text-brand-dark">{sub.name}</h4>
-                                <span className="text-xs text-brand-primary font-bold font-mono bg-white px-2 py-0.5 rounded border border-black/5">
-                                  {sub.emailOrPhone}
-                                </span>
-                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                                  sub.status === 'unread' ? 'bg-red-100 text-red-700' : sub.status === 'replied' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-                                }`}>
-                                  {sub.status}
-                                </span>
-                                {sub.orderType && (
-                                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    {sub.orderType}
-                                  </span>
-                                )}
-                                {sub.trackingNumber && (
-                                  <span className="text-[10px] font-bold font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1 shadow-xs">
-                                    <Truck size={12} className="text-blue-600" />
-                                    <span>{sub.courierName || 'Courier'}: {sub.trackingNumber}</span>
-                                  </span>
-                                )}
-                                <span className="text-[10px] text-brand-gray ml-auto">{sub.createdAt}</span>
-                              </div>
-                              <h5 className="text-xs font-bold text-brand-dark">{sub.subject}</h5>
-                              <p className="text-xs text-brand-gray line-clamp-2 leading-relaxed">{sub.message}</p>
-                              {sub.notes && (
-                                <p className="text-[11px] text-amber-700 font-semibold bg-amber-50 p-2 rounded-lg border border-amber-200/50">
-                                  <strong>Admin Note:</strong> {sub.notes}
-                                </p>
-                              )}
-                            </div>
+                          <MessageCircle size={15} className="fill-white/20" />
+                          <span>Bulk WhatsApp Broadcast</span>
+                          {selectedSubmissionIds.length > 0 && (
+                            <span className="bg-white text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-black">
+                              {selectedSubmissionIds.length}
+                            </span>
+                          )}
+                        </button>
+
+                        <button 
+                          onClick={() => setShowAddOrderModal(true)}
+                          className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-900 text-white font-bold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Plus size={15} /> Log WhatsApp Order
+                        </button>
+
+                        <div className="relative">
+                          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-gray" size={16} />
+                          <input 
+                            type="text" 
+                            placeholder="Search customer, phone, tracking..." 
+                            value={contactSubmissionSearch}
+                            onChange={(e) => setContactSubmissionSearch(e.target.value)}
+                            className="bg-brand-light border border-black/10 rounded-xl py-2.5 pl-10 pr-4 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-primary/20 w-48 md:w-56"
+                          />
+                        </div>
+
+                        <select 
+                          value={contactSubmissionStatusFilter}
+                          onChange={(e) => setContactSubmissionStatusFilter(e.target.value as any)}
+                          className="bg-brand-light border border-black/10 rounded-xl py-2.5 px-3 text-xs font-bold outline-none cursor-pointer"
+                        >
+                          <option value="all">All Statuses ({contactSubmissions.length})</option>
+                          <option value="unread">Unread Only ({unreadCount})</option>
+                          <option value="read">Read Only</option>
+                          <option value="replied">Replied Only ({repliedCount})</option>
+                          <option value="in-transit">🚚 In-Transit / Dispatched ({inTransitCount})</option>
+                          <option value="pending-dispatch">📦 Pending Dispatch</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Quick Selection Filter Bar */}
+                    <div className="bg-brand-light/50 p-3.5 rounded-2xl border border-black/5 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-brand-gray mr-1">
+                          Quick Select:
+                        </span>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleSelectByStatus('in-transit')}
+                          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-xl text-xs font-bold border border-blue-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Truck size={13} /> In-Transit / Dispatched ({inTransitCount})
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSelectByStatus('replied')}
+                          className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold border border-emerald-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <CheckCircle size={13} /> Replied Customers ({repliedCount})
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSelectByStatus('unread')}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-bold border border-amber-200 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Clock size={13} /> Unread Inquiries ({unreadCount})
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleSelectAllFiltered}
+                          className="px-3 py-1.5 bg-white hover:bg-gray-100 text-brand-dark rounded-xl text-xs font-bold border border-black/10 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          {isAllFilteredSelected ? <CheckSquare size={13} className="text-emerald-600" /> : <Square size={13} />}
+                          <span>{isAllFilteredSelected ? 'Deselect All' : `Select Filtered (${filteredSubmissions.length})`}</span>
+                        </button>
+                      </div>
+
+                      {selectedSubmissionIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSubmissionIds([])}
+                          className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                        >
+                          Clear Selection ({selectedSubmissionIds.length})
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Prominent Bulk Action Bar (Visible when 1+ selected) */}
+                    {selectedSubmissionIds.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-zinc-900 to-emerald-900 text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl border border-emerald-700/50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-emerald-500 text-zinc-950 flex items-center justify-center font-black text-xs shadow-md">
+                            {selectedSubmissionIds.length}
                           </div>
-
-                          <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
-                            {!sub.trackingNumber ? (
-                              <button
-                                onClick={() => {
-                                  const trk = generateSimulatedTrackingNumber('TCS Express');
-                                  const estDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                                  const updated = contactSubmissions.map(s => s.id === sub.id ? { 
-                                    ...s, 
-                                    trackingNumber: trk, 
-                                    courierName: 'TCS Express', 
-                                    estimatedDeliveryDate: estDate, 
-                                    orderType: s.orderType || 'WhatsApp Order', 
-                                    status: 'replied' as const 
-                                  } : s);
-                                  setContactSubmissions(updated);
-                                  showToast(`Generated TCS Tracking #${trk}!`, "success");
-                                }}
-                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
-                                title="Generate simulated tracking number"
-                              >
-                                <Truck size={14} /> + Tracking
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${sub.courierName || 'Courier'}: ${sub.trackingNumber}`);
-                                  showToast(`Tracking #${sub.trackingNumber} copied!`, "success");
-                                }}
-                                className="px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-bold border border-blue-200 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
-                                title="Copy tracking number"
-                              >
-                                <Copy size={13} /> {sub.trackingNumber}
-                              </button>
-                            )}
-
-                            <button 
-                              onClick={() => setSelectedSubmission(sub)}
-                              className="px-3.5 py-2 bg-brand-primary text-white rounded-xl text-xs font-bold hover:bg-brand-secondary transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
-                            >
-                              <Eye size={14} /> Details
-                            </button>
-                            <a 
-                              href={`https://wa.me/${sub.emailOrPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                                sub.trackingNumber 
-                                  ? `Hi ${sub.name}! Your KCC Shop order "${sub.subject}" has been dispatched via ${sub.courierName || 'Courier'}. Tracking Number: ${sub.trackingNumber}. Estimated Delivery: ${sub.estimatedDeliveryDate || '2-3 days'}. Thank you!`
-                                  : `Hi ${sub.name}! Thank you for contacting KCC Store regarding "${sub.subject}". How can we help you?`
-                              )}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => {
-                                setContactSubmissions(contactSubmissions.map(s => s.id === sub.id ? { ...s, status: 'replied' } : s));
-                              }}
-                              className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
-                            >
-                              <MessageCircle size={14} /> WhatsApp
-                            </a>
-                            <button 
-                              onClick={() => {
-                                if (window.confirm("Are you sure you want to delete this submission?")) {
-                                  setContactSubmissions(contactSubmissions.filter(s => s.id !== sub.id));
-                                  showToast("Submission deleted.", "remove");
-                                }
-                              }}
-                              className="p-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-colors cursor-pointer"
-                              title="Delete submission"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                          <div>
+                            <h4 className="font-bold text-sm text-white">
+                              {selectedSubmissionIds.length} Customers Selected for Bulk Actions
+                            </h4>
+                            <p className="text-[11px] text-emerald-200/80">
+                              Send pre-filled WhatsApp dispatch/status updates, auto-generate courier tracking, or update records.
+                            </p>
                           </div>
                         </div>
-                      ))}
 
-                    {contactSubmissions.length === 0 && (
-                      <div className="text-center py-16 bg-brand-light/30 rounded-3xl">
-                        <Inbox size={48} className="mx-auto text-brand-gray mb-3" />
-                        <h4 className="font-bold text-lg text-brand-dark">No Submissions Found</h4>
-                        <p className="text-xs text-brand-gray">When visitors submit the contact form, messages will appear here for admin review.</p>
-                      </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsBulkWhatsAppModalOpen(true)}
+                            className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                          >
+                            <MessageCircle size={15} /> Send WhatsApp Status Update
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleBulkGenerateTracking}
+                            className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title="Generate TCS tracking numbers for selected messages without tracking"
+                          >
+                            <Truck size={14} /> + Generate Tracking
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleBulkMarkReplied}
+                            className="px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <CheckCircle size={14} /> Mark as Replied
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleBulkDelete}
+                            className="p-2.5 bg-red-500/20 hover:bg-red-600 text-red-300 hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-red-500/30"
+                            title="Delete selected submissions"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </motion.div>
                     )}
+
+                    {/* Messages List */}
+                    <div className="space-y-4">
+                      {filteredSubmissions.map((sub) => {
+                        const isSelected = selectedSubmissionIds.includes(sub.id);
+                        return (
+                          <div 
+                            key={sub.id} 
+                            className={`p-5 rounded-2xl border transition-all hover:shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                              isSelected
+                                ? 'bg-emerald-50/50 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm'
+                                : sub.status === 'unread' 
+                                  ? 'bg-red-50/50 border-red-200' 
+                                  : sub.status === 'replied' 
+                                    ? 'bg-emerald-50/20 border-emerald-200' 
+                                    : 'bg-brand-light/40 border-black/5'
+                            }`}
+                          >
+                            <div className="flex items-start gap-3.5 flex-grow min-w-0">
+                              {/* Checkbox for Bulk Selection */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSelectSubmission(sub.id)}
+                                className="mt-1 p-1 text-brand-gray hover:text-emerald-700 transition-colors cursor-pointer flex-shrink-0"
+                                title={isSelected ? 'Deselect customer' : 'Select customer for bulk action'}
+                              >
+                                {isSelected ? (
+                                  <CheckSquare size={20} className="text-emerald-600 fill-emerald-100" />
+                                ) : (
+                                  <Square size={20} className="text-gray-400 hover:text-gray-600" />
+                                )}
+                              </button>
+
+                              <div className={`p-3 rounded-xl flex-shrink-0 ${
+                                sub.status === 'unread' ? 'bg-red-500 text-white' : sub.status === 'replied' ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-brand-dark'
+                              }`}>
+                                <Inbox size={20} />
+                              </div>
+                              <div className="min-w-0 flex-grow space-y-1">
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                  <h4 className="font-bold text-sm md:text-base text-brand-dark">{sub.name}</h4>
+                                  <span className="text-xs text-brand-primary font-bold font-mono bg-white px-2 py-0.5 rounded border border-black/5">
+                                    {sub.emailOrPhone}
+                                  </span>
+                                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                                    sub.status === 'unread' ? 'bg-red-100 text-red-700' : sub.status === 'replied' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
+                                  }`}>
+                                    {sub.status}
+                                  </span>
+                                  {sub.orderType && (
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                      {sub.orderType}
+                                    </span>
+                                  )}
+                                  {sub.trackingNumber && (
+                                    <span className="text-[10px] font-bold font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md border border-blue-200 flex items-center gap-1 shadow-xs">
+                                      <Truck size={12} className="text-blue-600" />
+                                      <span>{sub.courierName || 'Courier'}: {sub.trackingNumber}</span>
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-brand-gray ml-auto">{sub.createdAt}</span>
+                                </div>
+                                <h5 className="text-xs font-bold text-brand-dark">{sub.subject}</h5>
+                                <p className="text-xs text-brand-gray line-clamp-2 leading-relaxed">{sub.message}</p>
+                                {sub.notes && (
+                                  <p className="text-[11px] text-amber-700 font-semibold bg-amber-50 p-2 rounded-lg border border-amber-200/50">
+                                    <strong>Admin Note:</strong> {sub.notes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0 border-t md:border-t-0 pt-3 md:pt-0">
+                              {!sub.trackingNumber ? (
+                                <button
+                                  onClick={() => {
+                                    const trk = generateSimulatedTrackingNumber('TCS Express');
+                                    const estDate = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                                    const updated = contactSubmissions.map(s => s.id === sub.id ? { 
+                                      ...s, 
+                                      trackingNumber: trk, 
+                                      courierName: 'TCS Express', 
+                                      estimatedDeliveryDate: estDate, 
+                                      orderType: s.orderType || 'WhatsApp Order', 
+                                      status: 'replied' as const 
+                                    } : s);
+                                    setContactSubmissions(updated);
+                                    showToast(`Generated TCS Tracking #${trk}!`, "success");
+                                  }}
+                                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                                  title="Generate simulated tracking number"
+                                >
+                                  <Truck size={14} /> + Tracking
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${sub.courierName || 'Courier'}: ${sub.trackingNumber}`);
+                                    showToast(`Tracking #${sub.trackingNumber} copied!`, "success");
+                                  }}
+                                  className="px-3 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-bold border border-blue-200 transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                  title="Copy tracking number"
+                                >
+                                  <Copy size={13} /> {sub.trackingNumber}
+                                </button>
+                              )}
+
+                              <button 
+                                onClick={() => setSelectedSubmission(sub)}
+                                className="px-3.5 py-2 bg-brand-primary text-white rounded-xl text-xs font-bold hover:bg-brand-secondary transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                              >
+                                <Eye size={14} /> Details
+                              </button>
+                              <a 
+                                href={`https://wa.me/${sub.emailOrPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                  sub.trackingNumber 
+                                    ? `Hi ${sub.name}! Your KCC Shop order "${sub.subject}" has been dispatched via ${sub.courierName || 'Courier'}. Tracking Number: ${sub.trackingNumber}. Estimated Delivery: ${sub.estimatedDeliveryDate || '2-3 days'}. Thank you!`
+                                    : `Hi ${sub.name}! Thank you for contacting KCC Store regarding "${sub.subject}". How can we help you?`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => {
+                                  setContactSubmissions(contactSubmissions.map(s => s.id === sub.id ? { ...s, status: 'replied' } : s));
+                                }}
+                                className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+                              >
+                                <MessageCircle size={14} /> WhatsApp
+                              </a>
+                              <button 
+                                onClick={() => {
+                                  if (window.confirm("Are you sure you want to delete this submission?")) {
+                                    setContactSubmissions(contactSubmissions.filter(s => s.id !== sub.id));
+                                    setSelectedSubmissionIds(selectedSubmissionIds.filter(id => id !== sub.id));
+                                    showToast("Submission deleted.", "remove");
+                                  }
+                                }}
+                                className="p-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-colors cursor-pointer"
+                                title="Delete submission"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {filteredSubmissions.length === 0 && (
+                        <div className="text-center py-16 bg-brand-light/30 rounded-3xl">
+                          <Inbox size={48} className="mx-auto text-brand-gray mb-3" />
+                          <h4 className="font-bold text-lg text-brand-dark">No Submissions Found</h4>
+                          <p className="text-xs text-brand-gray">When visitors submit the contact form or place orders, messages will appear here.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* TAB 9: WordPress Website Integration & Embed Portal */}
               {adminTab === 'wordpress' && (
@@ -3376,6 +4118,7 @@ if (file_exists(__DIR__ . '/index.html')) {
                   {/* Dropshipping Sub-Navigation Tabs */}
                   <div className="flex flex-wrap gap-2 border-b border-black/10 pb-4">
                     {[
+                      { id: 'whatsapp', label: '📱 WhatsApp Group/Channel Extractor', icon: MessageCircle },
                       { id: 'presets', label: '📦 One-Click Catalog Importer', icon: Zap },
                       { id: 'extractor', label: '🔗 Custom URL / ID Extractor', icon: ExternalLink },
                       { id: 'suppliers', label: '🏭 B2B Platforms & Suppliers', icon: Building2 },
@@ -3387,10 +4130,18 @@ if (file_exists(__DIR__ . '/index.html')) {
                       return (
                         <button
                           key={st.id}
-                          onClick={() => setDropshipSubTab(st.id as any)}
+                          onClick={() => {
+                            if (st.id === 'whatsapp') {
+                              setIsWhatsAppExtractorModalOpen(true);
+                            } else {
+                              setDropshipSubTab(st.id as any);
+                            }
+                          }}
                           className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
-                            dropshipSubTab === st.id
+                            dropshipSubTab === st.id && st.id !== 'whatsapp'
                               ? 'bg-zinc-900 text-white shadow-md'
+                              : st.id === 'whatsapp'
+                              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md cursor-pointer'
                               : 'bg-brand-light text-brand-gray hover:bg-black/5 hover:text-brand-dark'
                           }`}
                         >
@@ -6500,6 +7251,7 @@ add_filter('template_include', 'kcc_store_override_homepage');`;
         onClose={() => setIsBulkCsvModalOpen(false)}
         onImportProducts={handleBulkImportProducts}
         currentProducts={products}
+        onClearStoreCatalog={handleConfirmClearCompleteCatalog}
         showToast={showToast}
       />
 
@@ -6511,6 +7263,128 @@ add_filter('template_include', 'kcc_store_override_homepage');`;
         showToast={showToast}
         defaultExchangeRate={dropshipSettings.usdExchangeRate}
       />
+
+      {/* WhatsApp Product & Media Extractor Modal */}
+      <WhatsAppProductExtractorModal
+        isOpen={isWhatsAppExtractorModalOpen}
+        onClose={() => setIsWhatsAppExtractorModalOpen(false)}
+        onImportProducts={handleBulkImportProducts}
+        showToast={showToast}
+      />
+
+      {/* Bulk WhatsApp Status & Broadcast Messaging Modal */}
+      <BulkWhatsAppMessagingModal
+        isOpen={isBulkWhatsAppModalOpen}
+        onClose={() => setIsBulkWhatsAppModalOpen(false)}
+        submissions={contactSubmissions}
+        selectedIds={selectedSubmissionIds}
+        onUpdateSubmissions={(updated) => setContactSubmissions(updated)}
+        showToast={showToast}
+        storeSettings={storeSettings}
+      />
+
+      {/* Product Deletion Safety Confirmation Modal */}
+      {productDeleteModalState.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-black/10 text-center animate-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <Trash2 size={28} />
+            </div>
+
+            {productDeleteModalState.type === 'single' && productDeleteModalState.targetProduct && (
+              <>
+                <h3 className="text-xl font-display font-bold text-brand-dark mb-2">Delete Product?</h3>
+                <p className="text-xs text-brand-gray mb-4">
+                  Are you sure you want to permanently remove <span className="font-bold text-brand-dark">"{productDeleteModalState.targetProduct.name}"</span> from the store inventory?
+                </p>
+                <div className="p-3 bg-brand-light/60 rounded-xl flex items-center gap-3 text-left mb-6 border border-black/5">
+                  <img 
+                    src={productDeleteModalState.targetProduct.image} 
+                    alt={productDeleteModalState.targetProduct.name} 
+                    className="w-12 h-12 rounded-lg object-cover bg-white shrink-0 border border-black/5" 
+                  />
+                  <div className="min-w-0">
+                    <h5 className="font-bold text-xs text-brand-dark truncate">{productDeleteModalState.targetProduct.name}</h5>
+                    <p className="text-[11px] text-brand-primary font-bold">Rs.{productDeleteModalState.targetProduct.price.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setProductDeleteModalState({ isOpen: false, type: 'single' })}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleConfirmDeleteSingleProduct(productDeleteModalState.targetProduct!.id)}
+                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors shadow-md cursor-pointer"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </>
+            )}
+
+            {productDeleteModalState.type === 'selected' && (
+              <>
+                <h3 className="text-xl font-display font-bold text-brand-dark mb-2">Delete Selected Products?</h3>
+                <p className="text-xs text-brand-gray mb-6">
+                  You are about to delete <span className="font-bold text-red-600">{selectedProductIds.length} selected product(s)</span> from your store catalog. This operation cannot be undone.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setProductDeleteModalState({ isOpen: false, type: 'selected' })}
+                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirmDeleteSelectedProducts}
+                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors shadow-md cursor-pointer"
+                  >
+                    Delete ({selectedProductIds.length})
+                  </button>
+                </div>
+              </>
+            )}
+
+            {productDeleteModalState.type === 'all' && (
+              <>
+                <h3 className="text-xl font-display font-bold text-red-600 mb-2">⚠️ Wipe Complete Catalog?</h3>
+                <p className="text-xs text-brand-gray mb-4">
+                  This will delete <span className="font-bold text-brand-dark">ALL {products.length} products</span> from your store catalog.
+                </p>
+                <p className="text-[11px] text-amber-700 bg-amber-50 p-3 rounded-xl border border-amber-200 mb-6 text-left">
+                  💡 <strong>Tip:</strong> If you are planning to upload a new CSV file or start fresh, you can clear the catalog now and upload your new spreadsheet, or restore the default demo catalog later.
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  <button
+                    onClick={handleConfirmClearCompleteCatalog}
+                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors shadow-md cursor-pointer"
+                  >
+                    Yes, Delete Complete Catalog ({products.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleResetCatalog();
+                      setProductDeleteModalState({ isOpen: false, type: 'all' });
+                    }}
+                    className="w-full py-2.5 bg-brand-light hover:bg-black/5 text-brand-dark text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Reset to Default Demo Products
+                  </button>
+                  <button
+                    onClick={() => setProductDeleteModalState({ isOpen: false, type: 'all' })}
+                    className="w-full py-2 text-brand-gray hover:text-brand-dark text-xs font-medium transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

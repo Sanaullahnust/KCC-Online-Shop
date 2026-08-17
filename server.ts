@@ -255,6 +255,83 @@ async function startServer() {
     });
   });
 
+  // Server-Side WhatsApp Broadcast & Channel Message Extractor API
+  app.post("/api/whatsapp/extract", async (req, res) => {
+    const { text, channelName } = req.body;
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: "WhatsApp text content is required" });
+    }
+
+    try {
+      // Split broadcast posts
+      const chunks = text
+        .split(/(?:[-—_=]{3,}|(?:\r?\n){2,}(?=[0-9]+[️⃣\.\)\-]|Product:|🔥|⚡|✅|AOA|Item:))/gi)
+        .map(c => c.trim())
+        .filter(c => c.length > 25);
+
+      const itemsToParse = chunks.length > 0 ? chunks : [text.trim()];
+
+      const products = itemsToParse.map((chunk, index) => {
+        // Extract Name
+        let name = '';
+        const nameMatch = 
+          chunk.match(/(?:Product|Item|Title|Name|Item Name)\s*[:：\-]\s*([^\n\r]+)/i) ||
+          chunk.match(/^(?:[0-9]+[️⃣\.\)\-]\s*|[🔥⚡✨👉📦]\s*)([^\n\r]+)/m);
+
+        if (nameMatch && nameMatch[1]) {
+          name = nameMatch[1].replace(/[🔥⚡✨👉📦✅1-9️⃣]/g, '').trim();
+        } else {
+          name = chunk.split('\n')[0].replace(/[🔥⚡✨👉📦✅]/g, '').trim();
+        }
+        if (!name) name = `WhatsApp Product Item ${index + 1}`;
+
+        // Extract Price
+        let costPrice = 850;
+        const priceMatch = chunk.match(/(?:Wholesale|Supplier Cost|Price|Rate|Cost|Rs\.?|PKR)\s*[:：\-]?\s*(?:Rs\.?|PKR)?\s*([0-9,]+)/i);
+        if (priceMatch && priceMatch[1]) {
+          const parsedNum = parseInt(priceMatch[1].replace(/,/g, ''), 10);
+          if (parsedNum > 50 && parsedNum < 100000) costPrice = parsedNum;
+        }
+
+        // Extract URLs
+        const urlRegex = /(https?:\/\/[^\s\n\r\t<>"]+)/gi;
+        const urls = chunk.match(urlRegex) || [];
+        const imageUrls: string[] = [];
+        const videoUrls: string[] = [];
+
+        urls.forEach(u => {
+          const clean = u.replace(/[,\.\)]+$/, '');
+          if (clean.match(/\.(mp4|webm|mov)(\?.*)?$/i) || clean.includes('mixkit.co/videos')) {
+            videoUrls.push(clean);
+          } else if (clean.match(/\.(jpg|jpeg|png|webp)(\?.*)?$/i) || clean.includes('unsplash.com')) {
+            imageUrls.push(clean);
+          }
+        });
+
+        return {
+          id: `wa_srv_${Date.now()}_${index}`,
+          name,
+          costPricePkr: costPrice,
+          retailPricePkr: Math.round(costPrice * 1.65),
+          weight: 350,
+          category: chunk.toLowerCase().includes('kitchen') ? 'Kitchen' : chunk.toLowerCase().includes('solar') ? 'Home Improvement' : 'Gadgets',
+          image: imageUrls[0] || 'https://images.unsplash.com/photo-1590212151175-e58edd96185c?q=80&w=800',
+          images: imageUrls,
+          video: videoUrls[0] || null,
+          source: channelName || "WhatsApp Group"
+        };
+      });
+
+      return res.json({
+        success: true,
+        count: products.length,
+        products
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: "Failed to parse WhatsApp content", details: err?.message });
+    }
+  });
+
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
