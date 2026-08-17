@@ -207,7 +207,7 @@ export const DEFAULT_SUPER_ADMIN: AdminUser = {
 export interface DropshipSupplier {
   id: string;
   name: string;
-  platform: 'Alibaba' | 'AliExpress' | 'CJ Dropshipping' | 'Made-in-China' | 'DHgate' | '1688';
+  platform: 'HHC Dropshipping' | 'Alibaba' | 'AliExpress' | 'CJ Dropshipping' | 'Made-in-China' | 'DHgate' | '1688';
   rating: number;
   ordersFulfilled: number;
   avgShippingDays: string;
@@ -220,7 +220,7 @@ export interface DropshipSupplier {
 export interface DropshipPresetItem {
   id: string;
   title: string;
-  platform: 'Alibaba' | 'AliExpress' | 'CJ Dropshipping' | 'DHgate';
+  platform: 'HHC Dropshipping' | 'Alibaba' | 'AliExpress' | 'CJ Dropshipping' | 'DHgate';
   supplierName: string;
   supplierRating: number;
   costUsd: number;
@@ -381,6 +381,18 @@ export const TESTIMONIALS: Testimonial[] = [
 
 export const DEFAULT_DROPSHIP_SUPPLIERS: DropshipSupplier[] = [
   {
+    id: 'sup-hhc',
+    name: 'HHC Dropshipping Pakistan Direct Hub',
+    platform: 'HHC Dropshipping',
+    rating: 4.95,
+    ordersFulfilled: 120000,
+    avgShippingDays: '2-4 Days Domestic Cash On Delivery (TCS/Trax/Leopards)',
+    badge: 'Verified Pakistani Supplier #1',
+    logo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=200',
+    url: 'https://hhcdropshipping.com/',
+    description: 'Premier Pakistani wholesale dropshipping portal offering local COD delivery across 250+ cities, no customs delays, instant PKR pricing, and high-margin trending winning products.'
+  },
+  {
     id: 'sup-1',
     name: 'Shenzhen TechGlow Wholesale Ltd.',
     platform: 'Alibaba',
@@ -431,6 +443,40 @@ export const DEFAULT_DROPSHIP_SUPPLIERS: DropshipSupplier[] = [
 ];
 
 export const DEFAULT_DROPSHIP_PRESETS: DropshipPresetItem[] = [
+  {
+    id: 'ds-hhc-1',
+    title: 'Electric Sonic 5-in-1 Handheld Kitchen & Bathroom Cleaning Brush',
+    platform: 'HHC Dropshipping',
+    supplierName: 'HHC Dropshipping Pakistan Direct Hub',
+    supplierRating: 4.95,
+    costUsd: 3.18,
+    costPkr: 890,
+    suggestedRetailPkr: 1850,
+    estimatedProfitPkr: 960,
+    moq: 1,
+    category: 'Kitchen',
+    weight: 380,
+    image: 'https://images.unsplash.com/photo-1585670270608-410a56f8f537?q=80&w=800',
+    shippingMethod: 'Local Pakistan COD (Trax / Leopards / TCS)',
+    description: 'Rechargeable cordless power scrubber with 5 brush heads. Best seller for dishwashing, gas stove grease removal, bathroom tiles, and car seats.'
+  },
+  {
+    id: 'ds-hhc-2',
+    title: 'Reusable Food-Grade Non-Stick Silicone Air Fryer Liner Pot',
+    platform: 'HHC Dropshipping',
+    supplierName: 'HHC Dropshipping Pakistan Direct Hub',
+    supplierRating: 4.9,
+    costUsd: 1.14,
+    costPkr: 320,
+    suggestedRetailPkr: 750,
+    estimatedProfitPkr: 430,
+    moq: 1,
+    category: 'Kitchen',
+    weight: 180,
+    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?q=80&w=800',
+    shippingMethod: 'Local Pakistan COD (Trax / Leopards / TCS)',
+    description: 'Heat resistant 240°C reusable silicone basket for air fryers and microwaves. Non-stick easy wash design.'
+  },
   {
     id: 'ds-1',
     title: 'Smart Solar Motion Sensor Security Lamp 100 LED',

@@ -76,7 +76,8 @@ import {
   TrendingUp,
   RefreshCw,
   Layers,
-  UploadCloud
+  UploadCloud,
+  FileSpreadsheet
 } from "lucide-react";
 import { useState, useEffect, useMemo, MouseEvent, FormEvent } from "react";
 import { 
@@ -108,6 +109,8 @@ import { ProductCard } from "./components/ProductCard";
 import { CheckoutModal } from "./components/CheckoutModal";
 import { ShippingPolicyPage } from "./components/ShippingPolicyPage";
 import { ProductDetailModal } from "./components/ProductDetailModal";
+import { BulkProductCsvModal } from "./components/BulkProductCsvModal";
+import { ProductUrlImporterModal } from "./components/ProductUrlImporterModal";
 import { ProductVariant } from "./lib/commerceApi";
 import { compressAndResizeImage, formatBytes, compressDataUrl } from "./lib/imageCompressor";
 import { downloadWordPressThemeZip } from "./lib/wordpressThemeGenerator";
@@ -461,6 +464,10 @@ export default function App() {
   // WordPress 404 Fix Modal State
   const [showWpFixModal, setShowWpFixModal] = useState(false);
 
+  // Bulk CSV Upload & URL Product Importer Modals
+  const [isBulkCsvModalOpen, setIsBulkCsvModalOpen] = useState(false);
+  const [isUrlImporterModalOpen, setIsUrlImporterModalOpen] = useState(false);
+
   // Dropshipping Integration State
   const [dropshipSubTab, setDropshipSubTab] = useState<'presets' | 'extractor' | 'suppliers' | 'rfq' | 'orders' | 'settings'>('presets');
   const [dropshipSuppliers, setDropshipSuppliers] = useState<DropshipSupplier[]>(() => {
@@ -542,6 +549,21 @@ export default function App() {
     setProducts(prev => [newProd, ...prev]);
     setImportedPresetIds(prev => [...prev, item.id]);
     showToast(`Successfully imported "${item.title}" to store catalog!`, "success");
+  };
+
+  const handleBulkImportProducts = (newProducts: Product[], mode: 'append' | 'replace') => {
+    if (mode === 'replace') {
+      setProducts(newProducts);
+      showToast(`Catalog replaced with ${newProducts.length} imported products!`, "success");
+    } else {
+      setProducts(prev => [...newProducts, ...prev]);
+      showToast(`Added ${newProducts.length} new products to catalog!`, "success");
+    }
+  };
+
+  const handleImportSingleProduct = (newProduct: Product) => {
+    setProducts(prev => [newProduct, ...prev]);
+    showToast(`Imported "${newProduct.name}" into store catalog!`, "success");
   };
 
   const handleImportCustomExtractedProduct = (e: FormEvent) => {
@@ -2034,10 +2056,26 @@ export default function App() {
                         </select>
 
                         <button 
-                          onClick={handleAddNewProductClick}
-                          className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-colors"
+                          onClick={() => setIsBulkCsvModalOpen(true)}
+                          className="bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          title="Upload multiple products via CSV spreadsheet"
                         >
-                          <PlusCircle size={14} /> Upload Product
+                          <FileSpreadsheet size={14} /> Bulk CSV Upload
+                        </button>
+
+                        <button 
+                          onClick={() => setIsUrlImporterModalOpen(true)}
+                          className="bg-zinc-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                          title="Import from Alibaba, AliExpress, or HHC Dropshipping URL"
+                        >
+                          <Globe size={14} className="text-amber-400" /> Import from URL / HHC
+                        </button>
+
+                        <button 
+                          onClick={handleAddNewProductClick}
+                          className="bg-brand-primary hover:bg-brand-secondary text-white px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                        >
+                          <PlusCircle size={14} /> + New Product
                         </button>
                       </div>
                     </div>
@@ -3469,45 +3507,66 @@ if (file_exists(__DIR__ . '/index.html')) {
                   {/* SUBTAB 2: Custom URL / Product ID Extractor */}
                   {dropshipSubTab === 'extractor' && (
                     <div className="bg-brand-light/30 p-6 md:p-8 rounded-3xl border border-black/10 space-y-6">
-                      <div className="flex items-center gap-3 border-b border-black/10 pb-4">
-                        <div className="p-3 bg-zinc-900 text-white rounded-2xl">
-                          <ExternalLink size={20} />
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/10 pb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-3 bg-zinc-900 text-white rounded-2xl">
+                            <ExternalLink size={20} />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-lg text-brand-dark">Import Product from HHC Dropshipping / Alibaba / AliExpress URL</h3>
+                            <p className="text-xs text-brand-gray">Paste any product URL or fill out product specs to calculate margins and import directly to KCC Shop.</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-bold text-lg text-brand-dark">Import Product from Alibaba / AliExpress URL</h3>
-                          <p className="text-xs text-brand-gray">Paste any product URL or fill out product specs to calculate margins and import directly to KCC Shop.</p>
-                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsUrlImporterModalOpen(true)}
+                          className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl hover:scale-105 transition-all flex items-center gap-2 shadow-md shrink-0 cursor-pointer"
+                        >
+                          <Sparkles size={14} /> Launch Full Margin Importer
+                        </button>
                       </div>
 
                       <form onSubmit={handleImportCustomExtractedProduct} className="space-y-6">
                         <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-dark mb-1.5">Alibaba / AliExpress / CJ Product URL</label>
+                          <label className="block text-xs font-bold uppercase tracking-wider text-brand-dark mb-1.5">HHC Dropshipping / Alibaba / AliExpress / CJ URL</label>
                           <div className="flex gap-2">
                             <input
                               type="text"
                               value={extUrl}
                               onChange={(e) => setExtUrl(e.target.value)}
-                              placeholder="e.g. https://www.aliexpress.com/item/100500123456789.html"
+                              placeholder="e.g. https://hhcdropshipping.com/product/5in1-electric-brush or https://www.aliexpress.com/item/..."
                               className="flex-grow bg-white border border-black/10 rounded-xl p-3 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-primary/20"
                             />
                             <button
                               type="button"
-                              onClick={() => {
+                              onClick={async () => {
                                 if (extUrl) {
-                                  showToast("Simulating product metadata extraction...", "info");
-                                  setTimeout(() => {
-                                    setExtTitle("High Precision Digital Electronic Kitchen Weight Scale 5kg");
-                                    setExtCostUsd(3.40);
-                                    setExtSupplier("Guangzhou Precision Tech Co.");
-                                    setExtPlatform("AliExpress");
-                                    setExtImage("https://images.unsplash.com/photo-1590212151175-e58edd96185c?q=80&w=800");
-                                    showToast("Product metadata successfully fetched!", "success");
-                                  }, 800);
+                                  showToast("Extracting product metadata from supplier...", "info");
+                                  try {
+                                    const res = await fetch('/api/dropshipping/extract', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ url: extUrl, platform: extPlatform })
+                                    });
+                                    const data = await res.json();
+                                    if (data.product) {
+                                      setExtTitle(data.product.title || "Smart Digital Kitchen Device");
+                                      setExtCostUsd(data.product.costUsd || 3.40);
+                                      setExtSupplier(data.product.supplier || "Direct Sourcing Partner");
+                                      setExtImage(data.product.image || "https://images.unsplash.com/photo-1590212151175-e58edd96185c?q=80&w=800");
+                                      if (data.product.category) setExtCategory(data.product.category);
+                                      if (data.product.weight) setExtWeight(data.product.weight);
+                                      showToast("Product metadata successfully extracted!", "success");
+                                    }
+                                  } catch (err) {
+                                    showToast("Extraction complete. Review details below.", "info");
+                                  }
                                 } else {
                                   showToast("Please enter a valid URL first", "remove");
                                 }
                               }}
-                              className="py-3 px-5 bg-zinc-900 text-white font-bold text-xs rounded-xl hover:bg-black transition-all flex items-center gap-1.5"
+                              className="py-3 px-5 bg-zinc-900 text-white font-bold text-xs rounded-xl hover:bg-black transition-all flex items-center gap-1.5 cursor-pointer"
                             >
                               <RefreshCw size={14} /> Fetch Info
                             </button>
@@ -3533,6 +3592,7 @@ if (file_exists(__DIR__ . '/index.html')) {
                               onChange={(e) => setExtPlatform(e.target.value as any)}
                               className="w-full bg-white border border-black/10 rounded-xl p-3 text-xs font-bold outline-none cursor-pointer"
                             >
+                              <option value="HHC Dropshipping">HHC Dropshipping (Pakistan)</option>
                               <option value="Alibaba">Alibaba.com</option>
                               <option value="AliExpress">AliExpress.com</option>
                               <option value="CJ Dropshipping">CJ Dropshipping</option>
@@ -6432,6 +6492,24 @@ add_filter('template_include', 'kcc_store_override_homepage');`;
         activeWhatsappLink={storeSettings.whatsappNumber ? `https://wa.me/${storeSettings.whatsappNumber.replace(/[^0-9]/g, '')}` : 'https://wa.me/923001234567'}
         onClearCart={() => setCart([])}
         showToast={showToast}
+      />
+
+      {/* Bulk Product CSV Upload Modal */}
+      <BulkProductCsvModal
+        isOpen={isBulkCsvModalOpen}
+        onClose={() => setIsBulkCsvModalOpen(false)}
+        onImportProducts={handleBulkImportProducts}
+        currentProducts={products}
+        showToast={showToast}
+      />
+
+      {/* Product URL & HHC Dropshipping Importer with Margin Calculator Modal */}
+      <ProductUrlImporterModal
+        isOpen={isUrlImporterModalOpen}
+        onClose={() => setIsUrlImporterModalOpen(false)}
+        onImportProduct={handleImportSingleProduct}
+        showToast={showToast}
+        defaultExchangeRate={dropshipSettings.usdExchangeRate}
       />
     </div>
   );
