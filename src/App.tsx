@@ -6088,6 +6088,71 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   </div>
                 </div>
 
+                {/* Inventory Management Block */}
+                <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold uppercase tracking-widest text-brand-dark flex items-center gap-1.5">
+                        📦 Inventory & Stock Management
+                      </span>
+                    </div>
+                    {editingProduct.stock === 0 ? (
+                      <span className="px-2 py-0.5 rounded-md bg-red-600 text-white font-black text-[10px] uppercase">
+                        Out of Stock
+                      </span>
+                    ) : (editingProduct.stock ?? 10) <= (editingProduct.lowStockThreshold ?? 5) ? (
+                      <span className="px-2 py-0.5 rounded-md bg-amber-500 text-white font-black text-[10px] uppercase animate-pulse">
+                        Low Stock Alert
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white font-bold text-[10px] uppercase">
+                        In Stock ({editingProduct.stock ?? 10} Units)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-gray mb-1">
+                        Product SKU / Code
+                      </label>
+                      <input 
+                        type="text" 
+                        value={editingProduct.sku || ''}
+                        onChange={(e) => setEditingProduct({...editingProduct, sku: e.target.value})}
+                        placeholder="e.g. KCC-AP-01"
+                        className="w-full border border-black/10 bg-white rounded-xl p-2.5 text-xs font-mono font-bold focus:outline-none focus:border-brand-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-gray mb-1">
+                        Stock Quantity (Units)
+                      </label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={editingProduct.stock !== undefined ? editingProduct.stock : 10}
+                        onChange={(e) => setEditingProduct({...editingProduct, stock: Math.max(0, parseInt(e.target.value) || 0)})}
+                        className="w-full border border-black/10 bg-white rounded-xl p-2.5 text-xs font-mono font-black focus:outline-none focus:border-brand-primary"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider text-brand-gray mb-1">
+                        Low Stock Threshold
+                      </label>
+                      <input 
+                        type="number" 
+                        min="1"
+                        value={editingProduct.lowStockThreshold !== undefined ? editingProduct.lowStockThreshold : 5}
+                        onChange={(e) => setEditingProduct({...editingProduct, lowStockThreshold: Math.max(1, parseInt(e.target.value) || 5)})}
+                        className="w-full border border-black/10 bg-white rounded-xl p-2.5 text-xs font-mono font-bold focus:outline-none focus:border-brand-primary"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-brand-gray mb-1">Discount Note / Promo Tag (Optional)</label>
                   <input 

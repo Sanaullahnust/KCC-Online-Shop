@@ -12,6 +12,50 @@ export interface Product {
   isHot?: boolean;
   isTopSeller?: boolean;
   discountNote?: string;
+  stock?: number; // quantity in warehouse / inventory
+  lowStockThreshold?: number; // threshold below which item is marked as low stock (default 5)
+  sku?: string; // Stock Keeping Unit / Item Code
+  trackInventory?: boolean;
+}
+
+export function getProductStockStatus(product: Product) {
+  const stock = typeof product.stock === 'number' ? product.stock : 15;
+  const threshold = typeof product.lowStockThreshold === 'number' ? product.lowStockThreshold : 5;
+  
+  if (stock <= 0) {
+    return {
+      status: 'out_of_stock' as const,
+      stock: 0,
+      threshold,
+      label: 'Out of Stock',
+      shortLabel: 'Out of Stock',
+      badgeClass: 'bg-red-600 text-white',
+      isLow: true,
+      isOut: true,
+    };
+  }
+  if (stock <= threshold) {
+    return {
+      status: 'low_stock' as const,
+      stock,
+      threshold,
+      label: `Low Stock: Only ${stock} left`,
+      shortLabel: `Low Stock (${stock})`,
+      badgeClass: 'bg-amber-500 text-white',
+      isLow: true,
+      isOut: false,
+    };
+  }
+  return {
+    status: 'in_stock' as const,
+    stock,
+    threshold,
+    label: `In Stock (${stock} units)`,
+    shortLabel: `${stock} in stock`,
+    badgeClass: 'bg-emerald-600 text-white',
+    isLow: false,
+    isOut: false,
+  };
 }
 
 import electricLighterImg from "./assets/images/regenerated_image_1780400575356.jpg";
@@ -33,7 +77,10 @@ export const PRODUCTS: Product[] = [
     weight: 350,
     rating: 4.8,
     isTopSeller: true,
-    isHot: true
+    isHot: true,
+    stock: 14,
+    lowStockThreshold: 5,
+    sku: 'KCC-WTR-001'
   },
   {
     id: '1',
@@ -50,7 +97,10 @@ export const PRODUCTS: Product[] = [
     category: 'Gadgets',
     weight: 120, // 120g
     rating: 4.8,
-    isTopSeller: true
+    isTopSeller: true,
+    stock: 3, // Low stock demo
+    lowStockThreshold: 5,
+    sku: 'KCC-LGT-002'
   },
   {
     id: '2',
@@ -66,7 +116,10 @@ export const PRODUCTS: Product[] = [
     category: 'Home Improvement',
     weight: 1400, // 1.4kg
     rating: 4.9,
-    isTopSeller: true
+    isTopSeller: true,
+    stock: 18,
+    lowStockThreshold: 5,
+    sku: 'KCC-LMP-003'
   },
   {
     id: '3',
@@ -78,7 +131,10 @@ export const PRODUCTS: Product[] = [
     category: 'Gadgets',
     weight: 250, // 250g
     rating: 4.7,
-    isTopSeller: true
+    isTopSeller: true,
+    stock: 4, // Low stock demo
+    lowStockThreshold: 5,
+    sku: 'KCC-FAN-004'
   },
   {
     id: '4',
@@ -89,7 +145,10 @@ export const PRODUCTS: Product[] = [
     image: arcticAirImg,
     category: 'Home Improvement',
     weight: 950, // 950g
-    rating: 4.5
+    rating: 4.5,
+    stock: 2, // Low stock demo
+    lowStockThreshold: 5,
+    sku: 'KCC-CLR-005'
   },
   {
     id: '5',
@@ -100,7 +159,10 @@ export const PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1583863788434-e58a36330cf0?q=80&w=800',
     category: 'Gadgets',
     weight: 150, // 150g
-    rating: 4.6
+    rating: 4.6,
+    stock: 25,
+    lowStockThreshold: 5,
+    sku: 'KCC-CHG-006'
   },
   {
     id: '6',
@@ -111,7 +173,10 @@ export const PRODUCTS: Product[] = [
     image: neckCoolerImg,
     category: 'Gadgets',
     weight: 250, // 250g
-    rating: 4.4
+    rating: 4.4,
+    stock: 3, // Low stock demo
+    lowStockThreshold: 5,
+    sku: 'KCC-NCK-007'
   },
   {
     id: '7',
@@ -122,7 +187,10 @@ export const PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1513506490282-4d4716ee38cd?q=80&w=800',
     category: 'Home Improvement',
     weight: 350, // 350g
-    rating: 4.8
+    rating: 4.8,
+    stock: 12,
+    lowStockThreshold: 5,
+    sku: 'KCC-LGT-008'
   },
   {
     id: '8',
@@ -133,7 +201,10 @@ export const PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=800',
     category: 'Home Improvement',
     weight: 780, // 780g
-    rating: 4.7
+    rating: 4.7,
+    stock: 8,
+    lowStockThreshold: 5,
+    sku: 'KCC-BAG-009'
   },
   {
     id: '9',
@@ -144,7 +215,10 @@ export const PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?q=80&w=800',
     category: 'Gadgets',
     weight: 180, // 180g
-    rating: 4.5
+    rating: 4.5,
+    stock: 0, // Out of stock demo
+    lowStockThreshold: 5,
+    sku: 'KCC-PRT-010'
   },
   {
     id: '10',
@@ -155,7 +229,10 @@ export const PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1622144783734-ef87532d559c?q=80&w=800',
     category: 'Gadgets',
     weight: 280, // 280g
-    rating: 4.3
+    rating: 4.3,
+    stock: 6,
+    lowStockThreshold: 5,
+    sku: 'KCC-DFN-011'
   }
 ];
 

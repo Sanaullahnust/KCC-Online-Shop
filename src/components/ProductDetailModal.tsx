@@ -22,10 +22,13 @@ import {
   Phone,
   Tag,
   Clock,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  AlertCircle
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, getProductStockStatus } from '../types';
 import { getDefaultVariantsForProduct, ProductVariant } from '../lib/commerceApi';
+import { ProductImageViewer } from './ProductImageViewer';
 
 interface ReviewItem {
   id: string;
@@ -114,6 +117,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const unitPrice = selectedVariant ? selectedVariant.price : product.price;
   const totalPrice = unitPrice * quantity;
   const originalPrice = Math.round(unitPrice * 1.25);
+  
+  const stockInfo = getProductStockStatus(product);
+  const maxAvailableStock = stockInfo.stock > 0 ? stockInfo.stock : 1;
 
   // Media items calculation
   const mediaItems: { type: 'image' | 'video'; url: string }[] = [];
@@ -226,26 +232,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             
             {/* Left Column: Gallery & Media Viewer (5 Cols) */}
             <div className="lg:col-span-5 space-y-4">
-              {/* Active Image / Video Stage */}
-              <div className="relative aspect-square rounded-3xl overflow-hidden bg-brand-light border border-black/5 shadow-inner group">
-                {mediaItems[currentMediaIndex]?.type === 'video' ? (
-                  <video 
-                    src={mediaItems[currentMediaIndex].url}
-                    controls
-                    autoPlay
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <img
-                    src={mediaItems[currentMediaIndex]?.url || product.image}
-                    alt={product.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-
-                {/* Badges */}
-                <div className="absolute top-4 left-4 flex flex-col gap-2 z-10">
+              <div className="relative">
+                {/* Badges Overlay on Stage */}
+                <div className="absolute top-4 left-4 flex flex-col gap-2 z-20 pointer-events-none">
+                  {stockInfo.isLow && !stockInfo.isOut && (
+                    <span className="bg-amber-500 text-white font-black text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse border border-amber-300">
+                      <AlertTriangle size={12} className="fill-white/20" /> Low Stock: Only {stockInfo.stock} Units Left
+                    </span>
+                  )}
+                  {stockInfo.isOut && (
+                    <span className="bg-red-600 text-white font-black text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-lg flex items-center gap-1 border border-red-400">
+                      <AlertCircle size={12} /> Out of Stock
+                    </span>
+                  )}
                   {product.isHot && (
                     <span className="bg-red-600 text-white font-black text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
                       <Zap size={12} fill="currentColor" /> Hot Demand Item
@@ -258,47 +257,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
                 </div>
 
-                {/* Navigation Arrows for Media */}
-                {mediaItems.length > 1 && (
-                  <>
-                    <button
-                      onClick={() => setCurrentMediaIndex((currentMediaIndex - 1 + mediaItems.length) % mediaItems.length)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-brand-dark flex items-center justify-center shadow-lg backdrop-blur-sm transition-all"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-                    <button
-                      onClick={() => setCurrentMediaIndex((currentMediaIndex + 1) % mediaItems.length)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/80 hover:bg-white text-brand-dark flex items-center justify-center shadow-lg backdrop-blur-sm transition-all"
-                    >
-                      <ChevronRight size={20} />
-                    </button>
-                  </>
-                )}
+                {/* Upgraded Mobile Pinch-to-Zoom & Pan Gallery Image Viewer */}
+                <ProductImageViewer
+                  mediaItems={mediaItems}
+                  currentIndex={currentMediaIndex}
+                  onIndexChange={setCurrentMediaIndex}
+                  productName={product.name}
+                  allowFullscreen={true}
+                />
               </div>
-
-              {/* Thumbnails Row */}
-              {mediaItems.length > 1 && (
-                <div className="flex items-center gap-3 overflow-x-auto pb-1">
-                  {mediaItems.map((media, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentMediaIndex(idx)}
-                      className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 transition-all shrink-0 ${
-                        currentMediaIndex === idx ? 'border-brand-primary ring-2 ring-brand-primary/20 scale-105' : 'border-black/10 opacity-70 hover:opacity-100'
-                      }`}
-                    >
-                      {media.type === 'video' ? (
-                        <div className="w-full h-full bg-black/80 flex items-center justify-center text-white">
-                          <Sparkles size={18} />
-                        </div>
-                      ) : (
-                        <img src={media.url} alt="" className="w-full h-full object-cover" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
 
               {/* Trust Badges Bar */}
               <div className="grid grid-cols-2 gap-3 pt-2">
@@ -344,14 +311,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <h1 className="text-2xl md:text-3xl lg:text-4xl font-display font-black text-brand-dark leading-tight">
                   {product.name}
                 </h1>
-                <div className="flex items-center gap-4 mt-2 text-xs font-medium text-brand-gray">
-                  <span>SKU: <strong className="text-brand-dark font-mono">KCC-{product.id}</strong></span>
+                <div className="flex items-center gap-4 mt-2 text-xs font-medium text-brand-gray flex-wrap">
+                  <span>SKU: <strong className="text-brand-dark font-mono">{product.sku || `KCC-${product.id}`}</strong></span>
                   <span>•</span>
-                  <span className="text-emerald-600 font-bold flex items-center gap-1">
-                    <Check size={14} /> In Stock (Ready for Dispatch)
-                  </span>
+                  {stockInfo.isOut ? (
+                    <span className="text-red-600 font-bold flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                      <AlertCircle size={14} /> Out of Stock (0 units left)
+                    </span>
+                  ) : stockInfo.isLow ? (
+                    <span className="text-amber-700 font-bold flex items-center gap-1 bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200 animate-pulse">
+                      <AlertTriangle size={14} className="text-amber-600" /> Low Stock: Only {stockInfo.stock} units remaining!
+                    </span>
+                  ) : (
+                    <span className="text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      <Check size={14} /> In Stock ({stockInfo.stock} units ready for dispatch)
+                    </span>
+                  )}
                 </div>
               </div>
+
+              {/* Low Stock Urgency Banner */}
+              {stockInfo.isLow && !stockInfo.isOut && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 shadow-sm mt-0.5">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-950 flex items-center gap-2">
+                      Limited Stock Warning
+                      <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.2 rounded-full uppercase">Only {stockInfo.stock} Left</span>
+                    </h4>
+                    <p className="text-xs text-amber-800 mt-0.5 leading-snug">
+                      High demand for this item! Place your Cash on Delivery order now before our warehouse inventory sells out.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Price & Savings Box */}
               <div className="p-5 rounded-2xl bg-gradient-to-r from-brand-light via-blue-50/40 to-emerald-50/40 border border-black/5 flex flex-wrap items-baseline justify-between gap-4">
@@ -417,18 +412,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div className="flex items-center bg-white rounded-xl border border-black/10 p-1 shadow-sm">
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-brand-light text-brand-dark font-bold text-base transition-colors"
+                      disabled={stockInfo.isOut}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-brand-light text-brand-dark font-bold text-base transition-colors disabled:opacity-30"
                     >
                       -
                     </button>
-                    <span className="w-10 text-center font-bold font-mono text-sm">{quantity}</span>
+                    <span className="w-10 text-center font-bold font-mono text-sm">{stockInfo.isOut ? 0 : quantity}</span>
                     <button
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-brand-light text-brand-dark font-bold text-base transition-colors"
+                      onClick={() => {
+                        if (stockInfo.stock > 0 && quantity >= stockInfo.stock) {
+                          showToast(`Only ${stockInfo.stock} units available in stock!`, 'info');
+                          return;
+                        }
+                        setQuantity(quantity + 1);
+                      }}
+                      disabled={stockInfo.isOut || (stockInfo.stock > 0 && quantity >= stockInfo.stock)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-brand-light text-brand-dark font-bold text-base transition-colors disabled:opacity-30"
                     >
                       +
                     </button>
                   </div>
+                  {stockInfo.isLow && !stockInfo.isOut && (
+                    <span className="text-[10px] text-amber-700 font-bold">Max: {stockInfo.stock}</span>
+                  )}
                 </div>
 
                 <div className="text-right text-xs">
@@ -443,30 +449,44 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               {/* Primary Action Buttons */}
               <div className="flex flex-col gap-3 pt-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Add to Cart */}
-                  <button
-                    onClick={(e) => {
-                      onAddToCart(product, quantity, e, selectedVariant);
-                      showToast(`Added ${quantity}x "${product.name}" to cart!`, 'success');
-                    }}
-                    className="btn-primary py-4 justify-center text-sm font-bold uppercase tracking-wider gap-2 shadow-lg shadow-brand-primary/20"
-                  >
-                    <ShoppingBag size={18} /> Add to Cart
-                  </button>
+                {stockInfo.isOut ? (
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-center">
+                    <p className="text-sm font-bold text-red-700 mb-2">This product is currently out of stock.</p>
+                    <a
+                      href={whatsappShareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-3.5 px-6 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all inline-block"
+                    >
+                      <MessageCircle size={18} className="inline fill-current stroke-none" /> Contact on WhatsApp for Restock Alert
+                    </a>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Add to Cart */}
+                    <button
+                      onClick={(e) => {
+                        onAddToCart(product, quantity, e, selectedVariant);
+                        showToast(`Added ${quantity}x "${product.name}" to cart!`, 'success');
+                      }}
+                      className="btn-primary py-4 justify-center text-sm font-bold uppercase tracking-wider gap-2 shadow-lg shadow-brand-primary/20"
+                    >
+                      <ShoppingBag size={18} /> Add to Cart
+                    </button>
 
-                  {/* Buy Now / Quick Order */}
-                  <button
-                    onClick={() => {
-                      onQuickBuy(product, selectedVariant, quantity);
-                      onClose();
-                    }}
-                    className="py-4 px-6 bg-brand-dark hover:bg-black text-white rounded-2xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer active:scale-98"
-                  >
-                    <span>Instant Buy Now</span>
-                    <ArrowRight size={18} />
-                  </button>
-                </div>
+                    {/* Buy Now / Quick Order */}
+                    <button
+                      onClick={() => {
+                        onQuickBuy(product, selectedVariant, quantity);
+                        onClose();
+                      }}
+                      className="py-4 px-6 bg-brand-dark hover:bg-black text-white rounded-2xl text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl transition-all cursor-pointer active:scale-98"
+                    >
+                      <span>Instant Buy Now</span>
+                      <ArrowRight size={18} />
+                    </button>
+                  </div>
+                )}
 
                 {/* Direct WhatsApp Order */}
                 <a

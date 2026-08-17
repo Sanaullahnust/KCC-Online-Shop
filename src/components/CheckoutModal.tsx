@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
-import { X, ShoppingBag, Truck, MapPin, CheckCircle, CreditCard, ArrowRight, Sparkles, AlertCircle, Building, Phone, User, ShieldCheck, Tag } from 'lucide-react';
-import { Product } from '../types';
+import { X, ShoppingBag, Truck, MapPin, CheckCircle, CreditCard, ArrowRight, Sparkles, AlertCircle, Building, Phone, User, ShieldCheck, Tag, AlertTriangle } from 'lucide-react';
+import { Product, getProductStockStatus } from '../types';
 import { ProductVariant, getCheckoutUrl, createCart, getCommerceConfigStatus } from '../lib/commerceApi';
 
 export interface CartEntry {
@@ -96,6 +96,16 @@ export function CheckoutModal({
     e.preventDefault();
     if (!name.trim() || !phone.trim() || (shippingMethod === 'delivery' && (!address.trim() || !city.trim()))) {
       showToast('Please complete all required contact and shipping details.', 'remove');
+      return;
+    }
+
+    // Check for out of stock items
+    const outOfStockItem = cart.find(item => {
+      const st = getProductStockStatus(item.product);
+      return st.isOut;
+    });
+    if (outOfStockItem) {
+      showToast(`Cannot proceed: "${outOfStockItem.product.name}" is currently out of stock. Please remove it from your cart.`, 'remove');
       return;
     }
 
@@ -251,6 +261,51 @@ export function CheckoutModal({
         ) : (
           /* Form Screen */
           <form onSubmit={handleConfirmCheckout} className="p-6 md:p-8 space-y-6 overflow-y-auto max-h-[75vh]">
+            {/* Cart Items Preview & Stock Alerts */}
+            <div className="space-y-2.5">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-brand-dark">
+                Selected Items ({cart.reduce((s, i) => s + i.quantity, 0)} Units)
+              </label>
+              <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                {cart.map((item, idx) => {
+                  const stockStatus = getProductStockStatus(item.product);
+                  const unitPrice = item.variant ? item.variant.price : item.product.price;
+                  return (
+                    <div key={idx} className="p-2.5 rounded-2xl bg-brand-light/60 border border-black/5 flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img src={item.product.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-black/10 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-bold text-brand-dark truncate">{item.product.name}</p>
+                          <div className="flex items-center gap-2 text-[11px] text-brand-gray">
+                            <span>Qty: <strong className="font-mono text-brand-dark">{item.quantity}</strong></span>
+                            {item.variant && <span>• {item.variant.name}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="font-mono font-bold text-brand-primary block">
+                          Rs.{(unitPrice * item.quantity).toLocaleString()}
+                        </span>
+                        {stockStatus.isOut ? (
+                          <span className="text-[10px] text-red-600 font-extrabold flex items-center gap-1 justify-end">
+                            <AlertCircle size={11} /> Out of Stock
+                          </span>
+                        ) : stockStatus.isLow ? (
+                          <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1 justify-end">
+                            <AlertTriangle size={11} /> Only {stockStatus.stock} left
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-emerald-600 font-semibold">
+                            ✓ In Stock
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Delivery Method Toggle */}
             <div>
               <label className="block text-xs font-extrabold uppercase tracking-wider text-brand-dark mb-2">

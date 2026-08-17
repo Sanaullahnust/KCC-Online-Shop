@@ -45,6 +45,9 @@ interface ParsedProductRow {
   rating: number;
   isTopSeller: boolean;
   discountNote?: string;
+  stock?: number;
+  lowStockThreshold?: number;
+  sku?: string;
   isValid: boolean;
   errors: string[];
 }
@@ -127,8 +130,11 @@ export function BulkProductCsvModal({
   // Generate Sample CSV Template
   const generateSampleCsv = () => {
     const headers = [
+      'SKU',
       'Name',
       'Price',
+      'Stock',
+      'Low Stock Threshold',
       'Category',
       'Weight',
       'Description',
@@ -141,8 +147,11 @@ export function BulkProductCsvModal({
 
     const sampleRows = [
       [
+        '"KCC-WP-01"',
         '"Smart Rechargeable Water Pump"',
         '1200',
+        '25',
+        '5',
         '"Gadgets"',
         '350',
         '"Automatic touch water dispenser for 19L bottles. Fast USB charging."',
@@ -153,8 +162,11 @@ export function BulkProductCsvModal({
         '"Discount On Quantity"'
       ],
       [
+        '"KCC-ARC-02"',
         '"Electric Rechargeable Arc Lighter"',
         '250',
+        '3',
+        '5',
         '"Gadgets"',
         '120',
         '"Windproof plasma arc lighter. Ideal for kitchen gas stoves and camping."',
@@ -165,8 +177,11 @@ export function BulkProductCsvModal({
         '"Discount On Quantity"'
       ],
       [
+        '"KCC-BLND-03"',
         '"Heavy Duty 6-Blade Kitchen Blender"',
         '3800',
+        '18',
+        '5',
         '"Kitchen"',
         '1800',
         '"High speed copper motor for smoothies, shakes, spices, and puree."',
@@ -177,8 +192,11 @@ export function BulkProductCsvModal({
         '"Wholesale Rate"'
       ],
       [
+        '"KCC-LL-04"',
         '"Self-Leveling 3D Laser Level Meter"',
         '4500',
+        '2',
+        '5',
         '"Home Improvement"',
         '1100',
         '"12-line green beam laser with rechargeable battery & rotary tripod."',
@@ -200,14 +218,17 @@ export function BulkProductCsvModal({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast('Downloaded sample CSV template!', 'success');
+    showToast('Downloaded sample CSV template with stock fields!', 'success');
   };
 
   // Export current catalog as CSV
   const handleExportCurrentCatalog = () => {
     const headers = [
+      'SKU',
       'Name',
       'Price',
+      'Stock',
+      'Low Stock Threshold',
       'Category',
       'Weight',
       'Description',
@@ -219,8 +240,11 @@ export function BulkProductCsvModal({
     ];
 
     const rows = currentProducts.map(p => [
+      `"${(p.sku || `KCC-${p.id}`).replace(/"/g, '""')}"`,
       `"${p.name.replace(/"/g, '""')}"`,
       p.price,
+      p.stock ?? 10,
+      p.lowStockThreshold ?? 5,
       `"${p.category}"`,
       p.weight,
       `"${p.description.replace(/"/g, '""')}"`,
@@ -241,7 +265,7 @@ export function BulkProductCsvModal({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    showToast(`Exported ${currentProducts.length} products to CSV!`, 'success');
+    showToast(`Exported ${currentProducts.length} products with stock data to CSV!`, 'success');
   };
 
   // Parse CSV Helper handling quotes and commas
@@ -310,8 +334,11 @@ export function BulkProductCsvModal({
         return -1;
       };
 
+      const skuIdx = findCol(['sku', 'code', 'itemcode', 'model', 'productcode']);
       const nameIdx = findCol(['name', 'title', 'productname', 'item']);
       const priceIdx = findCol(['price', 'rate', 'pkr', 'cost', 'retail']);
+      const stockIdx = findCol(['stock', 'inventory', 'quantity', 'qty', 'units', 'stocklevel', 'available']);
+      const thresholdIdx = findCol(['lowstockthreshold', 'threshold', 'lowstock', 'alertlevel', 'minstock']);
       const categoryIdx = findCol(['category', 'cat', 'type', 'dept', 'collection']);
       const weightIdx = findCol(['weight', 'grams', 'wt', 'mass']);
       const descIdx = findCol(['description', 'desc', 'details', 'detail', 'info', 'summary']);
@@ -329,6 +356,9 @@ export function BulkProductCsvModal({
 
         const errors: string[] = [];
         
+        // SKU
+        const sku = skuIdx !== -1 && row[skuIdx] ? row[skuIdx].trim() : `KCC-${Date.now().toString().slice(-4)}-${i}`;
+
         // Name
         const name = nameIdx !== -1 && row[nameIdx] ? row[nameIdx].trim() : `Product Item #${i}`;
         if (!name || name.length < 2) {
@@ -343,6 +373,20 @@ export function BulkProductCsvModal({
         }
         if (price <= 0) {
           errors.push('Valid price > 0 is required');
+        }
+
+        // Stock (Inventory)
+        let stock = 15;
+        if (stockIdx !== -1 && row[stockIdx] !== undefined && row[stockIdx].trim() !== '') {
+          const cleanStock = row[stockIdx].replace(/[^0-9]/g, '');
+          stock = parseInt(cleanStock) || 0;
+        }
+
+        // Low stock threshold
+        let lowStockThreshold = 5;
+        if (thresholdIdx !== -1 && row[thresholdIdx] !== undefined && row[thresholdIdx].trim() !== '') {
+          const cleanTh = row[thresholdIdx].replace(/[^0-9]/g, '');
+          lowStockThreshold = parseInt(cleanTh) || 5;
         }
 
         // Category
@@ -404,8 +448,11 @@ export function BulkProductCsvModal({
 
         parsed.push({
           id: `bulk-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`,
+          sku,
           name,
           price,
+          stock,
+          lowStockThreshold,
           category,
           weight,
           description,
@@ -490,8 +537,11 @@ export function BulkProductCsvModal({
   const handleAddManualRow = () => {
     const newRow: ParsedProductRow = {
       id: `manual-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      sku: `KCC-MAN-${Date.now().toString().slice(-4)}`,
       name: 'New Product Item',
       price: 1500,
+      stock: 12,
+      lowStockThreshold: 5,
       category: 'Gadgets',
       weight: 350,
       description: 'High quality wholesale imported item with guaranteed manufacturer warranty.',
@@ -511,8 +561,12 @@ export function BulkProductCsvModal({
       .filter(r => r.isValid)
       .map(r => ({
         id: r.id,
+        sku: r.sku || `KCC-${r.id}`,
         name: r.name,
         price: r.price,
+        stock: r.stock !== undefined ? r.stock : 15,
+        lowStockThreshold: r.lowStockThreshold !== undefined ? r.lowStockThreshold : 5,
+        trackInventory: true,
         category: r.category,
         weight: r.weight,
         description: r.description,
@@ -823,11 +877,12 @@ export function BulkProductCsvModal({
                         </th>
                         <th className="p-3 w-10 text-center">#</th>
                         <th className="p-3 w-16">Image</th>
-                        <th className="p-3">Product Name & Description</th>
-                        <th className="p-3 w-28">Price (PKR)</th>
-                        <th className="p-3 w-36">Category</th>
-                        <th className="p-3 w-24 text-center">Weight (g)</th>
-                        <th className="p-3 w-20 text-center">Top Seller</th>
+                        <th className="p-3">Product Name, SKU & Description</th>
+                        <th className="p-3 w-24">Price (PKR)</th>
+                        <th className="p-3 w-28 text-center">Stock Level</th>
+                        <th className="p-3 w-32">Category</th>
+                        <th className="p-3 w-20 text-center">Weight (g)</th>
+                        <th className="p-3 w-16 text-center">Top Seller</th>
                         <th className="p-3 w-20 text-center">Status</th>
                         <th className="p-3 w-12 text-center">Action</th>
                       </tr>
@@ -835,6 +890,10 @@ export function BulkProductCsvModal({
                     <tbody className="divide-y divide-black/5">
                       {filteredPreviewRows.map((row, idx) => {
                         const isSelected = selectedRowIds.includes(row.id);
+                        const rowStock = row.stock !== undefined ? row.stock : 10;
+                        const isRowLowStock = rowStock > 0 && rowStock <= (row.lowStockThreshold ?? 5);
+                        const isRowOutOfStock = rowStock === 0;
+
                         return (
                           <tr 
                             key={row.id} 
@@ -843,7 +902,9 @@ export function BulkProductCsvModal({
                                 ? 'bg-indigo-50/60' 
                                 : !row.isValid 
                                   ? 'bg-red-50/50' 
-                                  : ''
+                                  : isRowLowStock
+                                    ? 'bg-amber-50/40'
+                                    : ''
                             }`}
                           >
                             {/* Checkbox */}
@@ -876,12 +937,22 @@ export function BulkProductCsvModal({
                               </div>
                             </td>
                             <td className="p-3">
-                              <input
-                                type="text"
-                                value={row.name}
-                                onChange={(e) => handleUpdateRowField(row.id, 'name', e.target.value)}
-                                className="w-full bg-transparent font-bold text-brand-dark focus:bg-white focus:ring-1 focus:ring-brand-primary p-1.5 rounded outline-none"
-                              />
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={row.name}
+                                  onChange={(e) => handleUpdateRowField(row.id, 'name', e.target.value)}
+                                  className="w-full bg-transparent font-bold text-brand-dark focus:bg-white focus:ring-1 focus:ring-brand-primary p-1 rounded outline-none"
+                                />
+                                <input
+                                  type="text"
+                                  value={row.sku || ''}
+                                  placeholder="SKU"
+                                  onChange={(e) => handleUpdateRowField(row.id, 'sku', e.target.value)}
+                                  className="w-24 bg-brand-light/60 font-mono text-[10px] text-brand-gray focus:bg-white focus:ring-1 focus:ring-brand-primary p-1 rounded outline-none shrink-0"
+                                  title="Product SKU / Code"
+                                />
+                              </div>
                               <input
                                 type="text"
                                 value={row.description}
@@ -910,6 +981,37 @@ export function BulkProductCsvModal({
                                 />
                               </div>
                             </td>
+                            {/* Stock & Low Stock Badge */}
+                            <td className="p-3 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={row.stock !== undefined ? row.stock : 10}
+                                  onChange={(e) => handleUpdateRowField(row.id, 'stock', Math.max(0, parseInt(e.target.value) || 0))}
+                                  className={`w-16 font-mono font-black text-center p-1 rounded-lg border text-xs outline-none focus:ring-1 focus:ring-brand-primary ${
+                                    isRowOutOfStock 
+                                      ? 'bg-red-50 text-red-700 border-red-300' 
+                                      : isRowLowStock 
+                                        ? 'bg-amber-50 text-amber-800 border-amber-300 font-bold' 
+                                        : 'bg-brand-light/60 text-brand-dark border-black/10'
+                                  }`}
+                                />
+                                {isRowOutOfStock ? (
+                                  <span className="px-1.5 py-0.2 rounded bg-red-600 text-white font-extrabold text-[9px] uppercase">
+                                    Out
+                                  </span>
+                                ) : isRowLowStock ? (
+                                  <span className="px-1.5 py-0.2 rounded bg-amber-500 text-white font-extrabold text-[9px] uppercase animate-pulse">
+                                    Low Stock
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] text-emerald-600 font-bold">
+                                    In Stock
+                                  </span>
+                                )}
+                              </div>
+                            </td>
                             <td className="p-3">
                               <select
                                 value={row.category}
@@ -926,9 +1028,9 @@ export function BulkProductCsvModal({
                                 type="number"
                                 value={row.weight}
                                 onChange={(e) => handleUpdateRowField(row.id, 'weight', parseInt(e.target.value) || 100)}
-                                className="w-16 bg-brand-light/60 font-bold text-brand-dark focus:bg-white focus:ring-1 focus:ring-brand-primary p-1.5 rounded outline-none text-center"
+                                className="w-14 bg-brand-light/60 font-bold text-brand-dark focus:bg-white focus:ring-1 focus:ring-brand-primary p-1.5 rounded outline-none text-center"
                               />
-                              <span className="text-[10px] text-brand-gray block text-center mt-0.5">grams</span>
+                              <span className="text-[10px] text-brand-gray block text-center mt-0.5">g</span>
                             </td>
                             <td className="p-3 text-center">
                               <input
