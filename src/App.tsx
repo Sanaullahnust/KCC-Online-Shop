@@ -1084,16 +1084,8 @@ export default function App() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Top Info Bar */}
-      <div className="bg-brand-dark text-white py-2 px-4 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] flex flex-wrap justify-center items-center gap-3 z-[60]">
+      <div className="bg-brand-dark text-white py-2 px-4 text-[10px] md:text-xs font-bold uppercase tracking-[0.2em] flex justify-center items-center gap-3 z-[60]">
         <span className="text-center">{storeSettings.topBarText}</span>
-        <CommerceEngineBadge />
-        <button
-          onClick={() => setShowWpFixModal(true)}
-          className="bg-brand-secondary/20 hover:bg-brand-secondary/40 text-brand-secondary border border-brand-secondary/40 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-normal transition-all cursor-pointer flex items-center gap-1 shadow-sm"
-          title="Setup kcconline.shop in WordPress"
-        >
-          <Globe size={12} /> Fix kcconline.shop 404
-        </button>
       </div>
       {/* Sticky Navbar */}
       <nav className={`sticky top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white shadow-md py-2' : 'bg-white md:bg-transparent py-4'}`}>
@@ -2726,15 +2718,23 @@ export default function App() {
                   <div className="bg-gradient-to-br from-amber-500/10 via-brand-light/60 to-emerald-500/10 border-2 border-brand-primary/30 rounded-3xl p-6 md:p-8 space-y-6 shadow-md relative overflow-hidden">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                       <div className="space-y-2 max-w-2xl">
-                        <div className="inline-flex items-center gap-2 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
-                          <Zap size={14} /> Official WordPress Theme Package (.ZIP)
+                        <div className="inline-flex items-center gap-2 bg-emerald-600/10 text-emerald-700 border border-emerald-600/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+                          <Zap size={14} /> Official WordPress Theme Package (v1.0.1 - White Screen Fixed)
                         </div>
                         <h3 className="text-2xl font-black text-brand-dark tracking-tight">
                           Install Complete Website as a Native WordPress Theme
                         </h3>
                         <p className="text-xs sm:text-sm text-brand-gray leading-relaxed">
-                          Download a single, complete <code className="bg-brand-primary/10 text-brand-primary font-bold px-1.5 py-0.5 rounded">.zip</code> archive containing all WordPress theme templates (<code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">style.css</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">functions.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">front-page.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">header.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">footer.php</code>), client-side store engine, WhatsApp checkout, responsive product catalog, and a custom WordPress Admin Settings Panel.
+                          Download a single, complete <code className="bg-brand-primary/10 text-brand-primary font-bold px-1.5 py-0.5 rounded">.zip</code> archive containing all WordPress theme templates (<code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">style.css</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">functions.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">front-page.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">header.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">footer.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">page.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">404.php</code>), server-rendered product catalog, WhatsApp checkout, and WordPress Admin Settings Panel.
                         </p>
+                        <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 p-3 rounded-2xl text-xs space-y-1">
+                          <div className="font-extrabold flex items-center gap-1.5">
+                            <span>✅</span> Blank White Page Issue Resolved:
+                          </div>
+                          <p className="text-[11px] text-emerald-900/90 leading-relaxed">
+                            The theme now uses server-side PHP HTML rendering so all products, images, and WhatsApp buttons render instantly without depending on client-side JavaScript execution. All PHP template files have been hardened against parse errors.
+                          </p>
+                        </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
