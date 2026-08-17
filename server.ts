@@ -71,6 +71,18 @@ async function startServer() {
     }
   });
 
+  // WordPress Theme Info & Quick Verification
+  app.get("/api/wordpress/theme-info", (req, res) => {
+    res.json({
+      themeName: "KCC Online Wholesale Shop",
+      themeSlug: "kcc-store-theme",
+      version: "1.0.0",
+      description: "Complete installable WordPress Theme with direct WhatsApp ordering, responsive product catalog, interactive cart, and courier tracking.",
+      installPath: "WordPress Admin > Appearance > Themes > Add New > Upload Theme",
+      supportedWordPress: "5.8 to 6.7+"
+    });
+  });
+
   // Shopify Checkout Session Proxy
   app.post("/api/commerce/checkout/shopify", async (req, res) => {
     const shopifyDomain = process.env.VITE_SHOPIFY_STORE_DOMAIN;

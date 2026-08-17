@@ -110,6 +110,7 @@ import { ShippingPolicyPage } from "./components/ShippingPolicyPage";
 import { ProductDetailModal } from "./components/ProductDetailModal";
 import { ProductVariant } from "./lib/commerceApi";
 import { compressAndResizeImage, formatBytes, compressDataUrl } from "./lib/imageCompressor";
+import { downloadWordPressThemeZip } from "./lib/wordpressThemeGenerator";
 
 import logoHeaderUrl from "./assets/images/regenerated_image_1779113340147.jpg";
 import heroBgUrl from "./assets/images/kcc_hero_kitchen_tools_1779111645990.png";
@@ -1928,7 +1929,7 @@ export default function App() {
                   { id: 'policies', label: '📜 Policy Pages' },
                   { id: 'user-management', label: '👥 Admin Users & Rights', count: adminUsers.length },
                   { id: 'dropshipping', label: '🌐 B2B Dropshipping Hub', count: dropshipPresets.length },
-                  { id: 'wordpress', label: '🌐 WordPress Integration' },
+                  { id: 'wordpress', label: '🌐 WP Theme (.ZIP) & Integration' },
                 ]
                 .filter(tab => !currentAdminUser || currentAdminUser.role === 'superadmin' || currentAdminUser.allowedTabs.includes(tab.id as AdminTab))
                 .map((tab) => (
@@ -2680,21 +2681,140 @@ export default function App() {
                           <Globe size={14} /> WordPress CMS Integration
                         </div>
                         <h2 className="text-2xl md:text-4xl font-display font-extrabold mb-2">
-                          Open & Embed KCC Store in WordPress
+                          Download & Install KCC Store on WordPress
                         </h2>
                         <p className="text-blue-100/80 text-xs md:text-sm max-w-2xl leading-relaxed">
-                          Embed this entire React Online Shop inside your existing WordPress site seamlessly using Gutenberg Custom HTML, Elementor, Divi, or our custom WordPress shortcode plugin.
+                          Download the complete website as a standalone, ready-to-install WordPress Theme (.ZIP) or embed it using shortcodes, iFrames, and standalone hosting.
                         </p>
                       </div>
 
-                      <a 
-                        href={window.location.href}
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="self-start md:self-auto px-5 py-3 bg-white text-brand-dark hover:bg-blue-50 rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shrink-0"
-                      >
-                        <ExternalLink size={14} /> Open Store URL
-                      </a>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button 
+                          onClick={async () => {
+                            showToast("Preparing WordPress Theme ZIP package...", "info");
+                            try {
+                              const filename = await downloadWordPressThemeZip({
+                                products,
+                                storeSettings,
+                                deals,
+                                testimonials
+                              });
+                              showToast(`🎉 Downloaded ${filename}! Ready to install in WordPress.`, "success");
+                            } catch (err: any) {
+                              console.error(err);
+                              showToast("Failed to generate WordPress theme ZIP.", "remove");
+                            }
+                          }}
+                          className="px-5 py-3 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-zinc-950 rounded-2xl text-xs font-extrabold uppercase tracking-wider transition-all flex items-center gap-2 shadow-xl hover:scale-105 cursor-pointer"
+                        >
+                          <Download size={16} /> Download WP Theme (.ZIP)
+                        </button>
+
+                        <a 
+                          href={window.location.href}
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="self-start md:self-auto px-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 border border-white/20 shrink-0"
+                        >
+                          <ExternalLink size={14} /> Preview Store
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🌟 FEATURED: Complete Downloadable WordPress Theme (.ZIP) Package */}
+                  <div className="bg-gradient-to-br from-amber-500/10 via-brand-light/60 to-emerald-500/10 border-2 border-brand-primary/30 rounded-3xl p-6 md:p-8 space-y-6 shadow-md relative overflow-hidden">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                      <div className="space-y-2 max-w-2xl">
+                        <div className="inline-flex items-center gap-2 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+                          <Zap size={14} /> Official WordPress Theme Package (.ZIP)
+                        </div>
+                        <h3 className="text-2xl font-black text-brand-dark tracking-tight">
+                          Install Complete Website as a Native WordPress Theme
+                        </h3>
+                        <p className="text-xs sm:text-sm text-brand-gray leading-relaxed">
+                          Download a single, complete <code className="bg-brand-primary/10 text-brand-primary font-bold px-1.5 py-0.5 rounded">.zip</code> archive containing all WordPress theme templates (<code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">style.css</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">functions.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">front-page.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">header.php</code>, <code className="bg-black/5 px-1 py-0.5 rounded text-[11px]">footer.php</code>), client-side store engine, WhatsApp checkout, responsive product catalog, and a custom WordPress Admin Settings Panel.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
+                        <button
+                          onClick={async () => {
+                            showToast("Packaging all store assets into theme zip...", "info");
+                            try {
+                              const filename = await downloadWordPressThemeZip({
+                                products,
+                                storeSettings,
+                                deals,
+                                testimonials
+                              });
+                              showToast(`🎉 Success! Downloaded ${filename}`, "success");
+                            } catch (err: any) {
+                              console.error(err);
+                              showToast("Error creating WordPress theme zip file", "remove");
+                            }
+                          }}
+                          className="px-8 py-4 bg-brand-primary hover:bg-brand-secondary text-white rounded-2xl text-sm font-black uppercase tracking-wider flex items-center justify-center gap-2 shadow-xl hover:shadow-2xl transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                        >
+                          <Download size={18} /> Download Theme ZIP Now
+                        </button>
+                        <span className="text-[10px] text-center text-brand-gray font-medium">
+                          📦 Ready for <strong>Appearance &gt; Themes &gt; Upload Theme</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Features Included Badges */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-black/5">
+                      <div className="bg-white/80 p-3 rounded-2xl border border-black/5 text-center">
+                        <span className="text-emerald-600 font-extrabold text-xs block">✅ 1-Click WhatsApp</span>
+                        <span className="text-[10px] text-brand-gray">Direct customer checkout</span>
+                      </div>
+                      <div className="bg-white/80 p-3 rounded-2xl border border-black/5 text-center">
+                        <span className="text-emerald-600 font-extrabold text-xs block">✅ Zero SQL Required</span>
+                        <span className="text-[10px] text-brand-gray">Instant plug & play setup</span>
+                      </div>
+                      <div className="bg-white/80 p-3 rounded-2xl border border-black/5 text-center">
+                        <span className="text-emerald-600 font-extrabold text-xs block">✅ WP Admin Settings</span>
+                        <span className="text-[10px] text-brand-gray">Appearance &gt; KCC Settings</span>
+                      </div>
+                      <div className="bg-white/80 p-3 rounded-2xl border border-black/5 text-center">
+                        <span className="text-emerald-600 font-extrabold text-xs block">✅ Shortcode [kcc_store]</span>
+                        <span className="text-[10px] text-brand-gray">Works with Elementor/Gutenberg</span>
+                      </div>
+                    </div>
+
+                    {/* 4-Step Installation Walkthrough */}
+                    <div className="bg-white p-5 md:p-6 rounded-2xl border border-black/5 space-y-4">
+                      <h4 className="font-bold text-sm text-brand-dark flex items-center gap-2">
+                        <span>📋</span> How to Install this Theme in WordPress (30-Second Guide):
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                        <div className="bg-brand-light/30 p-4 rounded-xl space-y-1.5 border border-black/5">
+                          <span className="w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-black flex items-center justify-center">1</span>
+                          <div className="font-bold text-brand-dark">Download .ZIP</div>
+                          <p className="text-brand-gray text-[11px] leading-relaxed">Click the download button to get <code className="text-brand-primary font-bold">kcc-store-theme.zip</code>.</p>
+                        </div>
+
+                        <div className="bg-brand-light/30 p-4 rounded-xl space-y-1.5 border border-black/5">
+                          <span className="w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-black flex items-center justify-center">2</span>
+                          <div className="font-bold text-brand-dark">Upload in WP</div>
+                          <p className="text-brand-gray text-[11px] leading-relaxed">In WP Admin, go to <strong>Appearance &gt; Themes &gt; Add New &gt; Upload Theme</strong>.</p>
+                        </div>
+
+                        <div className="bg-brand-light/30 p-4 rounded-xl space-y-1.5 border border-black/5">
+                          <span className="w-6 h-6 rounded-full bg-brand-primary text-white text-xs font-black flex items-center justify-center">3</span>
+                          <div className="font-bold text-brand-dark">Install & Activate</div>
+                          <p className="text-brand-gray text-[11px] leading-relaxed">Select the zip file, click <strong>Install Now</strong>, then click <strong>Activate</strong>.</p>
+                        </div>
+
+                        <div className="bg-brand-light/30 p-4 rounded-xl space-y-1.5 border border-black/5">
+                          <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center">4</span>
+                          <div className="font-bold text-brand-dark">Store Live!</div>
+                          <p className="text-brand-gray text-[11px] leading-relaxed">Your entire store is active! Configure WhatsApp number in <strong>Appearance &gt; KCC Store</strong>.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
