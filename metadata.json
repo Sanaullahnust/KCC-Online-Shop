@@ -1,0 +1,6 @@
+{
+  "name": "KCC Online Shop - Home Improvement & Gadgets",
+  "description": "Premium home improvement tools, kitchen essentials, and smart gadgets in Karak, KPK. Order via WhatsApp for fast local delivery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
