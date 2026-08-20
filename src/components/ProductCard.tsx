@@ -1,6 +1,6 @@
 import { useState, MouseEvent } from 'react';
-import { ShoppingBag, Star, Zap, Share2, Check, ArrowRight, Layers, Tag, AlertTriangle, AlertCircle, Package } from 'lucide-react';
-import { Product, getProductStockStatus } from '../types';
+import { ShoppingBag, Star, Zap, Share2, Check, ArrowRight, Layers, Tag, ShieldCheck, Sparkles, Truck } from 'lucide-react';
+import { Product } from '../types';
 import { getDefaultVariantsForProduct, ProductVariant } from '../lib/commerceApi';
 
 export interface ProductCardProps {
@@ -11,6 +11,48 @@ export interface ProductCardProps {
   onOpenGallery?: (product: Product, index?: number) => void;
   onDeleteProduct?: (productId: string, e?: MouseEvent) => void;
   isAdminLoggedIn?: boolean;
+}
+
+// Generate smart, attractive marketing tags based on product attributes
+function getProductTags(product: Product): { label: string; bg: string; text: string; icon?: any }[] {
+  const tags: { label: string; bg: string; text: string; icon?: any }[] = [];
+  const nameLower = product.name.toLowerCase();
+  const descLower = product.description.toLowerCase();
+
+  // Top badges
+  if (product.isHot) {
+    tags.push({ label: 'Hot Trending', bg: 'bg-red-500/10 border-red-500/20', text: 'text-red-600', icon: Zap });
+  }
+  if (product.isTopSeller) {
+    tags.push({ label: 'Top Seller', bg: 'bg-amber-500/10 border-amber-500/20', text: 'text-amber-700', icon: Star });
+  }
+
+  // Feature-based tags
+  if (nameLower.includes('rechargeable') || descLower.includes('rechargeable') || nameLower.includes('usb')) {
+    tags.push({ label: 'USB Rechargeable', bg: 'bg-blue-500/10 border-blue-500/20', text: 'text-blue-700', icon: Sparkles });
+  }
+  if (nameLower.includes('remote') || descLower.includes('remote')) {
+    tags.push({ label: 'With Remote', bg: 'bg-purple-500/10 border-purple-500/20', text: 'text-purple-700' });
+  }
+  if (nameLower.includes('water') || nameLower.includes('pump') || nameLower.includes('cooler') || nameLower.includes('fan')) {
+    tags.push({ label: 'Instant Cooling / Flow', bg: 'bg-cyan-500/10 border-cyan-500/20', text: 'text-cyan-700' });
+  }
+  if (product.category === 'Home Improvement') {
+    tags.push({ label: 'Heavy Duty', bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-700', icon: ShieldCheck });
+  }
+  if (product.category === 'Kitchen') {
+    tags.push({ label: 'Kitchen Essential', bg: 'bg-orange-500/10 border-orange-500/20', text: 'text-orange-700' });
+  }
+  if (product.category === 'Gadgets' && tags.length < 2) {
+    tags.push({ label: 'Smart Gadget', bg: 'bg-indigo-500/10 border-indigo-500/20', text: 'text-indigo-700' });
+  }
+
+  // Always ensure at least 2 attractive guarantee/feature tags
+  if (tags.length < 2) {
+    tags.push({ label: 'Wholesale Verified', bg: 'bg-emerald-500/10 border-emerald-500/20', text: 'text-emerald-700', icon: ShieldCheck });
+  }
+
+  return tags.slice(0, 3);
 }
 
 export function ProductCard({
@@ -27,8 +69,7 @@ export function ProductCard({
 
   const selectedVariant = variants.find(v => v.id === selectedVariantId) || variants[0];
   const activePrice = selectedVariant ? selectedVariant.price : product.price;
-  
-  const stockInfo = getProductStockStatus(product);
+  const attractiveTags = getProductTags(product);
 
   const handleCopyShareLink = (e: MouseEvent) => {
     e.stopPropagation();
@@ -53,20 +94,8 @@ export function ProductCard({
           referrerPolicy="no-referrer"
         />
 
-        {/* Badges */}
+        {/* Floating Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10 items-start">
-          {/* Low Stock Highlight Badge */}
-          {stockInfo.isLow && !stockInfo.isOut && (
-            <span className="bg-amber-500 text-white font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md flex items-center gap-1 animate-pulse border border-amber-300">
-              <AlertTriangle size={11} className="fill-white/20" /> Low Stock ({stockInfo.stock} Left)
-            </span>
-          )}
-          {/* Out of Stock Badge */}
-          {stockInfo.isOut && (
-            <span className="bg-red-600 text-white font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md flex items-center gap-1 border border-red-400">
-              <AlertCircle size={11} /> Out of Stock
-            </span>
-          )}
           {product.isHot && (
             <span className="bg-red-600 text-white font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
               <Zap size={11} fill="currentColor" /> Hot Item
@@ -108,11 +137,11 @@ export function ProductCard({
       {/* Content Details */}
       <div className="flex flex-col flex-grow">
         {/* Category & Rating Row */}
-        <div className="flex items-center justify-between text-[11px] text-brand-gray font-semibold mb-1">
-          <span className="px-2 py-0.5 rounded-md bg-brand-light text-brand-dark font-bold text-[10px] uppercase tracking-wider">
+        <div className="flex items-center justify-between text-[11px] text-brand-gray font-semibold mb-2">
+          <span className="px-2.5 py-0.5 rounded-md bg-brand-light text-brand-dark font-bold text-[10px] uppercase tracking-wider">
             {product.category}
           </span>
-          <div className="flex items-center gap-1 text-amber-500 font-bold">
+          <div className="flex items-center gap-1 text-amber-500 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/50">
             <Star size={12} fill="currentColor" />
             <span>{product.rating || 4.9}</span>
           </div>
@@ -128,18 +157,21 @@ export function ProductCard({
           {product.description}
         </p>
 
-        {/* Low stock urgency alert banner on card */}
-        {stockInfo.isLow && !stockInfo.isOut && (
-          <div className="mb-2.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold flex items-center justify-between">
-            <span className="flex items-center gap-1">
-              <AlertTriangle size={12} className="text-amber-600 shrink-0" />
-              <span>Only {stockInfo.stock} units left in stock</span>
-            </span>
-            <span className="text-[9px] uppercase tracking-wider text-amber-700 bg-amber-200/60 px-1.5 py-0.2 rounded font-black">
-              Hurry
-            </span>
-          </div>
-        )}
+        {/* Attractive Feature Tags Pill Strip */}
+        <div className="flex flex-wrap gap-1.5 mb-3.5">
+          {attractiveTags.map((tag, idx) => {
+            const IconComponent = tag.icon;
+            return (
+              <span 
+                key={idx}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold tracking-wide border ${tag.bg} ${tag.text}`}
+              >
+                {IconComponent && <IconComponent size={10} className="shrink-0" />}
+                <span>{tag.label}</span>
+              </span>
+            );
+          })}
+        </div>
 
         {/* Variant Choice Selection */}
         {variants.length > 0 && (
@@ -161,7 +193,7 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Price & Weight Row */}
+        {/* Price Row (Cleaned: Stock & Weight removed from listing) */}
         <div className="mt-auto pt-2 flex items-baseline justify-between border-t border-black/5">
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl md:text-2xl font-display font-black text-brand-primary font-mono">
@@ -173,45 +205,30 @@ export function ProductCard({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
-            {product.weight && (
-              <span className="text-[10px] font-bold text-brand-gray bg-brand-light px-2 py-0.5 rounded-md">
-                {product.weight}g
-              </span>
-            )}
+          <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+            <Truck size={11} /> COD Available
           </div>
         </div>
       </div>
 
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-2 mt-4 pt-2" onClick={(e) => e.stopPropagation()}>
-        {stockInfo.isOut ? (
-          <button
-            disabled
-            className="col-span-2 w-full bg-gray-100 text-gray-400 py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 border border-black/5 cursor-not-allowed"
-          >
-            <AlertCircle size={14} /> Sold Out / Out of Stock
-          </button>
-        ) : (
-          <>
-            <button
-              onClick={(e) => onAddToCart(product, 1, e, selectedVariant)}
-              className="w-full bg-brand-light hover:bg-black/10 text-brand-dark py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-black/5 cursor-pointer"
-            >
-              <ShoppingBag size={14} /> Add Cart
-            </button>
+        <button
+          onClick={(e) => onAddToCart(product, 1, e, selectedVariant)}
+          className="w-full bg-brand-light hover:bg-black/10 text-brand-dark py-2.5 px-3 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 border border-black/5 cursor-pointer"
+        >
+          <ShoppingBag size={14} /> Add Cart
+        </button>
 
-            <button
-              onClick={() => {
-                onAddToCart(product, 1, undefined, selectedVariant);
-                if (onQuickBuy) onQuickBuy(product, selectedVariant);
-              }}
-              className="w-full btn-primary py-2.5 px-3 text-xs font-extrabold flex items-center justify-center gap-1 shadow-sm active:scale-95 cursor-pointer"
-            >
-              Buy Now <ArrowRight size={14} />
-            </button>
-          </>
-        )}
+        <button
+          onClick={() => {
+            onAddToCart(product, 1, undefined, selectedVariant);
+            if (onQuickBuy) onQuickBuy(product, selectedVariant);
+          }}
+          className="w-full btn-primary py-2.5 px-3 text-xs font-extrabold flex items-center justify-center gap-1 shadow-sm active:scale-95 cursor-pointer"
+        >
+          Buy Now <ArrowRight size={14} />
+        </button>
       </div>
     </div>
   );

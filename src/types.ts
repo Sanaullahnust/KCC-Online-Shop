@@ -90,9 +90,7 @@ export const PRODUCTS: Product[] = [
     discountNote: 'Discount on Quantity',
     image: electricLighterImg,
     images: [
-      electricLighterImg,
-      'https://images.unsplash.com/photo-1590212151175-e58edd96185c?q=80&w=800',
-      'https://images.unsplash.com/photo-1590212150821-26055d21a221?q=80&w=800'
+      electricLighterImg
     ],
     category: 'Gadgets',
     weight: 120, // 120g
@@ -110,8 +108,7 @@ export const PRODUCTS: Product[] = [
     discountNote: 'Discount On Quantity',
     image: eagleLampImg,
     images: [
-      eagleLampImg,
-      'https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=800'
+      eagleLampImg
     ],
     category: 'Home Improvement',
     weight: 1400, // 1.4kg
@@ -249,9 +246,34 @@ export interface ContactSubmission {
   courierName?: string;
   orderType?: 'WhatsApp Order' | 'Contact Form' | 'Inquiry';
   estimatedDeliveryDate?: string;
+  replyHistory?: {
+    date: string;
+    channel: 'whatsapp' | 'email';
+    message: string;
+    sender?: string;
+  }[];
 }
 
-export type AdminTab = 'products' | 'contact-messages' | 'store-info' | 'hero' | 'deals' | 'testimonials' | 'policies' | 'user-management' | 'wordpress' | 'dropshipping';
+export interface CsvImportLog {
+  id: string;
+  timestamp: string;
+  fileName: string;
+  importMode: 'append' | 'replace';
+  totalRowsProcessed: number;
+  productsAddedCount: number;
+  productsUpdatedCount?: number;
+  errorsCount: number;
+  status: 'success' | 'partial' | 'failed';
+  errors: {
+    rowNumber: number;
+    productName?: string;
+    sku?: string;
+    errorReason: string;
+  }[];
+  importedProductNames: string[];
+}
+
+export type AdminTab = 'products' | 'import-logs' | 'contact-messages' | 'store-info' | 'hero' | 'deals' | 'testimonials' | 'policies' | 'user-management' | 'wordpress' | 'dropshipping';
 
 export interface AdminUser {
   id: string;
@@ -273,7 +295,7 @@ export const DEFAULT_SUPER_ADMIN: AdminUser = {
   password: 'kccadmin2024',
   name: 'Main Admin (Superadmin)',
   role: 'superadmin',
-  allowedTabs: ['products', 'contact-messages', 'store-info', 'hero', 'deals', 'testimonials', 'policies', 'user-management', 'wordpress', 'dropshipping'],
+  allowedTabs: ['products', 'import-logs', 'contact-messages', 'store-info', 'hero', 'deals', 'testimonials', 'policies', 'user-management', 'wordpress', 'dropshipping'],
   allowedCategories: [], // All categories
   maxDiscountPercent: 100,
   canDeleteProducts: true,

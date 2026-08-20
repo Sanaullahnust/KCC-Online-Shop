@@ -115,6 +115,9 @@ import { BulkProductCsvModal } from "./components/BulkProductCsvModal";
 import { ProductUrlImporterModal } from "./components/ProductUrlImporterModal";
 import { WhatsAppProductExtractorModal } from "./components/WhatsAppProductExtractorModal";
 import { BulkWhatsAppMessagingModal } from "./components/BulkWhatsAppMessagingModal";
+import { ImportLogsTab } from "./components/ImportLogsTab";
+import { CustomerReplySection } from "./components/CustomerReplySection";
+import { ProductImageViewer } from "./components/ProductImageViewer";
 import { ProductVariant } from "./lib/commerceApi";
 import { compressAndResizeImage, formatBytes, compressDataUrl } from "./lib/imageCompressor";
 import { downloadWordPressThemeZip } from "./lib/wordpressThemeGenerator";
@@ -2069,6 +2072,7 @@ export default function App() {
               <div className="flex flex-wrap gap-2 mb-8 bg-white p-3 rounded-2xl border border-black/5 shadow-md">
                 {[
                   { id: 'products', label: '📦 Products Catalog', count: products.length },
+                  { id: 'import-logs', label: '📋 CSV Import Logs' },
                   { id: 'contact-messages', label: '📩 Contact Messages', count: contactSubmissions.filter(s => s.status === 'unread').length },
                   { id: 'store-info', label: '⚙️ Store Info & Shipping' },
                   { id: 'hero', label: '🎨 Hero Banner' },
@@ -2626,6 +2630,14 @@ export default function App() {
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* TAB: CSV Import Logs */}
+              {adminTab === 'import-logs' && (
+                <ImportLogsTab 
+                  onOpenCsvModal={() => setIsBulkCsvModalOpen(true)}
+                  showToast={showToast}
+                />
               )}
 
               {/* TAB 2: Store Info & Shipping Rates */}
@@ -5544,98 +5556,58 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-10"
+            className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 backdrop-blur-xl p-4 md:p-8"
           >
-            <button 
-              onClick={() => setSelectedProductForGallery(null)}
-              className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors z-[110]"
-            >
-              <X size={40} strokeWidth={1} />
-            </button>
-
-            <div className="relative w-full max-w-5xl aspect-video flex items-center justify-center">
-              {getProductMedia(selectedProductForGallery).length > 1 && (
-                <>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                    className="absolute left-0 text-white/50 hover:text-white bg-white/5 hover:bg-white/10 p-4 rounded-full transition-all z-[110]"
-                  >
-                    <ChevronRight className="rotate-180" size={32} />
-                  </button>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                    className="absolute right-0 text-white/50 hover:text-white bg-white/5 hover:bg-white/10 p-4 rounded-full transition-all z-[110]"
-                  >
-                    <ChevronRight size={32} />
-                  </button>
-                </>
-              )}
-
-              <motion.div 
-                key={currentImageIndex}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="w-full h-full flex items-center justify-center"
+            <div className="w-full max-w-5xl flex items-center justify-between pb-3 z-[110]">
+              <div className="flex items-center gap-3">
+                <h3 className="text-white text-base md:text-lg font-display font-bold">{selectedProductForGallery.name}</h3>
+                <span className="text-brand-secondary text-sm md:text-base font-mono font-extrabold bg-white/10 px-3 py-0.5 rounded-full backdrop-blur-md">
+                  Rs.{selectedProductForGallery.price}
+                </span>
+              </div>
+              <button 
+                onClick={() => setSelectedProductForGallery(null)}
+                className="text-white/60 hover:text-white transition-colors bg-white/10 hover:bg-white/20 p-2 rounded-full cursor-pointer"
+                title="Close Gallery Viewer"
               >
-                {getProductMedia(selectedProductForGallery)[currentImageIndex]?.type === 'video' ? (
-                  <video 
-                    src={getProductMedia(selectedProductForGallery)[currentImageIndex].url}
-                    controls
-                    autoPlay
-                    className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
-                  />
-                ) : (
-                  <img 
-                    src={getProductMedia(selectedProductForGallery)[currentImageIndex]?.url} 
-                    alt={selectedProductForGallery.name} 
-                    className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
-                    referrerPolicy="no-referrer"
-                  />
-                )}
-              </motion.div>
-              
-              <div className="absolute -bottom-28 md:-bottom-24 left-0 right-0 flex flex-col items-center">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-white text-lg md:text-xl font-display font-bold">{selectedProductForGallery.name}</h3>
-                  <span className="text-brand-secondary text-base md:text-lg font-mono font-extrabold bg-white/10 px-3 py-0.5 rounded-full backdrop-blur-md">
-                    Rs.{selectedProductForGallery.price}
-                  </span>
-                </div>
-                
-                <div className="flex justify-center gap-2 mb-3">
-                  {getProductMedia(selectedProductForGallery).map((_, idx) => (
-                    <button 
-                      key={idx}
-                      onClick={() => setCurrentImageIndex(idx)}
-                      className={`h-1.5 rounded-full transition-all ${idx === currentImageIndex ? 'w-8 bg-brand-primary' : 'w-2 bg-white/20'}`}
-                    />
-                  ))}
-                </div>
+                <X size={24} />
+              </button>
+            </div>
 
-                <div className="bg-white/10 backdrop-blur-md p-2 md:px-5 md:py-2.5 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-3 flex-wrap justify-center">
-                  <a 
-                    href={`https://wa.me/?text=${encodeURIComponent(`Check out ${selectedProductForGallery.name} (Rs.${selectedProductForGallery.price}) at KCC Wholesale Shop! ${window.location.origin}${window.location.pathname}?product=${selectedProductForGallery.id}`)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95"
-                    title="Share product link via WhatsApp"
-                  >
-                    <MessageCircle size={16} className="fill-current stroke-none" />
-                    <span>Share via WhatsApp</span>
-                  </a>
+            <div className="relative w-full max-w-5xl flex-grow max-h-[70vh] flex items-center justify-center">
+              <ProductImageViewer 
+                mediaItems={getProductMedia(selectedProductForGallery)}
+                currentIndex={currentImageIndex}
+                onIndexChange={(idx) => setCurrentImageIndex(idx)}
+                productName={selectedProductForGallery.name}
+                allowFullscreen={true}
+                className="w-full h-full max-h-[70vh]"
+              />
+            </div>
+            
+            <div className="w-full max-w-5xl flex flex-col items-center pt-4 z-[110]">
+              <div className="bg-white/10 backdrop-blur-md p-2 md:px-5 md:py-2.5 rounded-2xl border border-white/10 shadow-2xl flex items-center gap-3 flex-wrap justify-center">
+                <a 
+                  href={`https://wa.me/?text=${encodeURIComponent(`Check out ${selectedProductForGallery.name} (Rs.${selectedProductForGallery.price}) at KCC Wholesale Shop! ${window.location.origin}${window.location.pathname}?product=${selectedProductForGallery.id}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 cursor-pointer"
+                  title="Share product link via WhatsApp"
+                >
+                  <MessageCircle size={16} className="fill-current stroke-none" />
+                  <span>Share via WhatsApp</span>
+                </a>
 
-                  <button 
-                    onClick={(e) => addToCart(selectedProductForGallery, 1, e)}
-                    className="bg-brand-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-1.5"
-                  >
-                    <ShoppingBag size={14} /> Add to Cart
-                  </button>
+                <button 
+                  onClick={(e) => addToCart(selectedProductForGallery, 1, e)}
+                  className="bg-brand-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ShoppingBag size={14} /> Add to Cart
+                </button>
 
-                  <div className="h-4 w-px bg-white/20 hidden sm:block"></div>
+                <div className="h-4 w-px bg-white/20 hidden sm:block"></div>
 
-                  <ShareButtons product={selectedProductForGallery} />
-                </div>
+                <ShareButtons product={selectedProductForGallery} />
               </div>
             </div>
           </motion.div>
@@ -6718,29 +6690,23 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                 )}
               </div>
 
+              {/* Interactive Multi-Channel Customer Reply Section */}
+              <CustomerReplySection 
+                submission={selectedSubmission}
+                onUpdateSubmission={(updated) => {
+                  setContactSubmissions(contactSubmissions.map(s => s.id === updated.id ? updated : s));
+                  setSelectedSubmission(updated);
+                }}
+                showToast={showToast}
+              />
+
               {/* Action Bar */}
-              <div className="flex gap-3 pt-2">
-                <a 
-                  href={`https://wa.me/${selectedSubmission.emailOrPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
-                    selectedSubmission.trackingNumber 
-                      ? `Hi ${selectedSubmission.name}! Your KCC Shop order "${selectedSubmission.subject}" has been dispatched via ${selectedSubmission.courierName || 'Courier'}. Tracking Number: ${selectedSubmission.trackingNumber}. Estimated Delivery: ${selectedSubmission.estimatedDeliveryDate || '2-3 business days'}. Thank you for shopping with us!`
-                      : `Hi ${selectedSubmission.name}! Thank you for reaching out to KCC Store regarding "${selectedSubmission.subject}".`
-                  )}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => {
-                    const updated = contactSubmissions.map(s => s.id === selectedSubmission.id ? { ...s, status: 'replied' as const } : s);
-                    setContactSubmissions(updated);
-                  }}
-                  className="flex-1 btn-primary py-3 justify-center text-xs font-bold uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 shadow-md"
-                >
-                  <MessageCircle size={16} /> WhatsApp Customer
-                </a>
+              <div className="flex justify-end gap-3 pt-2">
                 <button 
                   onClick={() => setSelectedSubmission(null)}
-                  className="px-6 py-3 bg-brand-light hover:bg-gray-200 text-brand-dark rounded-xl text-xs font-bold uppercase tracking-wider"
+                  className="px-6 py-3 bg-brand-light hover:bg-gray-200 text-brand-dark rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer transition-colors"
                 >
-                  Close
+                  Close Modal
                 </button>
               </div>
             </div>

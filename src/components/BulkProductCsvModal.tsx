@@ -22,7 +22,8 @@ import {
   Filter,
   AlertTriangle
 } from 'lucide-react';
-import { Product } from '../types';
+import { Product, CsvImportLog } from '../types';
+import { saveImportLog } from './ImportLogsTab';
 
 interface BulkProductCsvModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ export function BulkProductCsvModal({
 }: BulkProductCsvModalProps) {
   const [activeTab, setActiveTab] = useState<'upload' | 'paste' | 'manual'>('upload');
   const [csvText, setCsvText] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('catalog_import.csv');
   const [parsedRows, setParsedRows] = useState<ParsedProductRow[]>([]);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [previewSearch, setPreviewSearch] = useState('');
@@ -484,6 +486,7 @@ export function BulkProductCsvModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadedFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -501,6 +504,7 @@ export function BulkProductCsvModal({
     setDragOver(false);
     const file = e.dataTransfer.files?.[0];
     if (file) {
+      setUploadedFileName(file.name);
       const reader = new FileReader();
       reader.onload = (event) => {
         const content = event.target?.result as string;
@@ -557,30 +561,57 @@ export function BulkProductCsvModal({
   };
 
   const handleConfirmImport = () => {
-    const validProducts: Product[] = parsedRows
-      .filter(r => r.isValid)
-      .map(r => ({
-        id: r.id,
-        sku: r.sku || `KCC-${r.id}`,
-        name: r.name,
-        price: r.price,
-        stock: r.stock !== undefined ? r.stock : 15,
-        lowStockThreshold: r.lowStockThreshold !== undefined ? r.lowStockThreshold : 5,
-        trackInventory: true,
-        category: r.category,
-        weight: r.weight,
-        description: r.description,
-        image: r.image,
-        images: r.images && r.images.length > 0 ? r.images : [r.image],
-        rating: r.rating || 4.8,
-        isTopSeller: r.isTopSeller,
-        discountNote: r.discountNote || 'Discount On Quantity'
-      }));
+    const validRows = parsedRows.filter(r => r.isValid);
+    const invalidRows = parsedRows.filter(r => !r.isValid);
+
+    const validProducts: Product[] = validRows.map(r => ({
+      id: r.id,
+      sku: r.sku || `KCC-${r.id}`,
+      name: r.name,
+      price: r.price,
+      stock: r.stock !== undefined ? r.stock : 15,
+      lowStockThreshold: r.lowStockThreshold !== undefined ? r.lowStockThreshold : 5,
+      trackInventory: true,
+      category: r.category,
+      weight: r.weight,
+      description: r.description,
+      image: r.image,
+      images: r.images && r.images.length > 0 ? r.images : [r.image],
+      rating: r.rating || 4.8,
+      isTopSeller: r.isTopSeller,
+      discountNote: r.discountNote || 'Discount On Quantity'
+    }));
 
     if (validProducts.length === 0) {
       showToast('Please fix validation errors or add at least one valid product.', 'remove');
       return;
     }
+
+    // Record structured import log
+    const errorsList = invalidRows.map((inv, idx) => ({
+      rowNumber: idx + 1,
+      productName: inv.name,
+      sku: inv.sku,
+      errorReason: inv.errors.join(', ') || 'Invalid field values'
+    }));
+
+    const status: 'success' | 'partial' | 'failed' = 
+      invalidRows.length === 0 ? 'success' : (validRows.length > 0 ? 'partial' : 'failed');
+
+    const logEntry: CsvImportLog = {
+      id: `log-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      fileName: uploadedFileName || (activeTab === 'manual' ? 'Manual Data Entry' : 'Pasted Raw CSV'),
+      importMode,
+      totalRowsProcessed: parsedRows.length,
+      productsAddedCount: validProducts.length,
+      errorsCount: invalidRows.length,
+      status,
+      errors: errorsList,
+      importedProductNames: validProducts.map(p => p.name)
+    };
+
+    saveImportLog(logEntry);
 
     onImportProducts(validProducts, importMode);
     onClose();
