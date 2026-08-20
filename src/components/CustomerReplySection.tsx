@@ -50,7 +50,7 @@ export function CustomerReplySection({
     switch (templateKey) {
       case 'dispatch':
         if (submission.trackingNumber) {
-          return `Assalam-o-Alaikum ${name},\n\nYour order regarding "${subj}" has been dispatched via ${courier}!\n\n📦 Courier: ${courier}\n🔢 Tracking Number: ${trk}\n🚚 Estimated Delivery: ${estDate}\n\nYou can track your parcel on the courier website or pay Cash on Delivery (COD) upon receiving.\n\nThank you for choosing KCC Online Shop!\nContact: +92 300 1234567`;
+          return `Assalam-o-Alaikum ${name},\n\nYour order regarding "${subj}" has been dispatched via ${courier}!\n\n📦 Courier: ${courier}\n🔢 Tracking Number: ${trk}\n🚚 Estimated Delivery: ${estDate}\n\nYour advance payment transfer has been verified and your parcel is in transit.\n\nThank you for choosing KCC Online Shop!\nContact: +92 300 1234567`;
         } else {
           return `Assalam-o-Alaikum ${name},\n\nThank you for reaching out to KCC Online Shop regarding "${subj}".\n\nYour order is confirmed and is currently being packed in our warehouse. We will dispatch it shortly and send you the tracking number.\n\nBest regards,\nKCC Store Team`;
         }

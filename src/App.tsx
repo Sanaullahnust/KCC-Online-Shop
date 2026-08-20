@@ -79,7 +79,8 @@ import {
   UploadCloud,
   FileSpreadsheet,
   LayoutGrid,
-  List
+  List,
+  QrCode
 } from "lucide-react";
 import { useState, useEffect, useMemo, MouseEvent, FormEvent } from "react";
 import { 
@@ -103,7 +104,9 @@ import {
   DEFAULT_DROPSHIP_SUPPLIERS,
   DEFAULT_DROPSHIP_PRESETS,
   DEFAULT_DROPSHIP_ORDERS,
-  DEFAULT_DROPSHIP_SETTINGS
+  DEFAULT_DROPSHIP_SETTINGS,
+  SHIPPING_COUNTRIES,
+  ShippingCountry
 } from "./types";
 
 import { CommerceEngineBadge } from "./components/CommerceEngineBadge";
@@ -424,7 +427,7 @@ export default function App() {
       'TCS Express': 'TCS',
       'Leopard Courier': 'LCS',
       'Trax Logistics': 'TRX',
-      'PostEx COD': 'PEX',
+      'PostEx': 'PEX',
       'CallCourier': 'CC',
       'M&P Courier': 'MNP'
     };
@@ -645,6 +648,7 @@ export default function App() {
 
   // Advanced States for improved Cart UI and interactive feedback
   const [shippingMethod, setShippingMethod] = useState<'delivery' | 'pickup'>('delivery');
+  const [shippingCountry, setShippingCountry] = useState<string>('Pakistan');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'remove' } | null>(null);
   const [cartBadgePulse, setCartBadgePulse] = useState(false);
   const [lastUpdatedItemId, setLastUpdatedItemId] = useState<string | null>(null);
@@ -1096,11 +1100,20 @@ export default function App() {
   
   const deliveryCharge = useMemo(() => {
     if (cart.length === 0 || shippingMethod === 'pickup') return 0;
-    if (cartTotalWeight <= 500) return 250;
-    if (cartTotalWeight <= 1000) return 400;
-    // Above 1000g, dynamic stepping: base 400 for first 1kg, plus Rs. 150 per extra 500g (or portion thereof)
-    return 400 + Math.ceil((cartTotalWeight - 1000) / 500) * 150;
-  }, [cart, cartTotalWeight, shippingMethod]);
+    const countryData = SHIPPING_COUNTRIES.find(c => c.name === shippingCountry) || SHIPPING_COUNTRIES[0];
+    
+    if (countryData.isDomestic) {
+      const fee500 = storeSettings?.deliveryFee500g || countryData.fee500g || 250;
+      const fee1kg = storeSettings?.deliveryFee1kg || countryData.fee1kg || 400;
+      if (cartTotalWeight <= 500) return fee500;
+      if (cartTotalWeight <= 1000) return fee1kg;
+      return fee1kg + Math.ceil((cartTotalWeight - 1000) / 500) * (countryData.extra500g || 150);
+    } else {
+      if (cartTotalWeight <= 500) return countryData.fee500g;
+      if (cartTotalWeight <= 1000) return countryData.fee1kg;
+      return countryData.fee1kg + Math.ceil((cartTotalWeight - 1000) / 500) * countryData.extra500g;
+    }
+  }, [cart, cartTotalWeight, shippingMethod, shippingCountry, storeSettings]);
 
   const cartGrandTotal = cartTotal + deliveryCharge;
 
@@ -1214,7 +1227,9 @@ export default function App() {
     text += `Total Weight: ${cartTotalWeight >= 1000 ? `${(cartTotalWeight / 1000).toFixed(2)} kg` : `${cartTotalWeight} g`}\n`;
     
     if (shippingMethod === 'delivery') {
+      text += `Destination: ${shippingCountry}\n`;
       text += `Postage/Delivery: Rs.${deliveryCharge}\n`;
+      text += `Estimated Delivery: ${shippingCountry === 'Pakistan' ? '2-3 business days in Pakistan' : `10-12 working days outside Pakistan internationally selected country (${shippingCountry})`}\n`;
       text += `Grand Total: Rs.${cartGrandTotal}\n`;
       text += `Delivery Option: Home Delivery\n`;
     } else {
@@ -2724,6 +2739,206 @@ export default function App() {
                               value={storeSettings.deliveryFee1kg}
                               onChange={(e) => setStoreSettings({...storeSettings, deliveryFee1kg: Number(e.target.value)})}
                               className="w-full border border-black/10 rounded-xl py-3 pl-10 pr-3 text-sm font-bold focus:outline-none focus:border-brand-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* QR Codes & Bank Accounts Setup */}
+                    <div className="pt-6 border-t border-black/5 space-y-6">
+                      <div>
+                        <h3 className="text-lg font-bold text-brand-dark flex items-center gap-2">
+                          <QrCode className="text-emerald-600" size={20} /> Bank & Payment QR Codes (Checkout Scanner)
+                        </h3>
+                        <p className="text-xs text-brand-gray mt-1">
+                          Configure QR codes and accounts for Easypaisa, JazzCash, and Bank AL Habib so customers can scan them directly during checkout.
+                        </p>
+                      </div>
+
+                      {/* 1. Easypaisa QR */}
+                      <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 1. Easypaisa QR Code & Account
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="md:col-span-3">
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Easypaisa QR Image URL</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.easypaisaQr || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, easypaisaQr: e.target.value})}
+                              placeholder="https://... or api.qrserver.com URL"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Account Title</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.easypaisaTitle || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, easypaisaTitle: e.target.value})}
+                              placeholder="e.g. KCC Store"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs bg-white font-medium"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Easypaisa Mobile Number</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.easypaisaNumber || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, easypaisaNumber: e.target.value})}
+                              placeholder="03295147517"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. JazzCash QR */}
+                      <div className="p-4 rounded-2xl bg-red-50/60 border border-red-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-red-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span> 2. JazzCash QR Code & Account
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div className="md:col-span-3">
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">JazzCash QR Image URL</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.jazzcashQr || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, jazzcashQr: e.target.value})}
+                              placeholder="https://... or api.qrserver.com URL"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Account Title</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.jazzcashTitle || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, jazzcashTitle: e.target.value})}
+                              placeholder="e.g. KCC Store"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs bg-white font-medium"
+                            />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">JazzCash Mobile / Till Number</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.jazzcashNumber || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, jazzcashNumber: e.target.value})}
+                              placeholder="03295147517"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3. Bank AL Habib QR */}
+                      <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-blue-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span> 3. Bank AL Habib QR Code & Account
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Bank AL Habib QR Image URL</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankAlHabibQr || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankAlHabibQr: e.target.value})}
+                              placeholder="https://... or api.qrserver.com URL"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Account Title</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankAlHabibTitle || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankAlHabibTitle: e.target.value})}
+                              placeholder="KCC Wholesale Traders"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs bg-white font-medium"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Account Number</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankAlHabibAccountNumber || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankAlHabibAccountNumber: e.target.value})}
+                              placeholder="1029-0981-002341-01-9"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">IBAN</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankAlHabibIban || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankAlHabibIban: e.target.value})}
+                              placeholder="PK45BAHL1029098100234101"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 4. Meezan Bank & Raast */}
+                      <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-xs text-purple-950 uppercase tracking-wider flex items-center gap-1.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-purple-600"></span> 4. Meezan Bank & Raast ID
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Meezan QR Image URL</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankQr || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankQr: e.target.value})}
+                              placeholder="https://... or api.qrserver.com URL"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Account Title</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankAccountTitle || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankAccountTitle: e.target.value})}
+                              placeholder="KCC Online Wholesale Shop"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs bg-white font-medium"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Account Number</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.bankAccountNumber || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, bankAccountNumber: e.target.value})}
+                              placeholder="01020105829102"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase text-brand-gray mb-1">Raast ID</label>
+                            <input 
+                              type="text" 
+                              value={storeSettings.raastId || ''}
+                              onChange={(e) => setStoreSettings({...storeSettings, raastId: e.target.value})}
+                              placeholder="03295147517"
+                              className="w-full border border-zinc-200 rounded-xl p-2.5 text-xs font-mono bg-white"
                             />
                           </div>
                         </div>
@@ -4966,7 +5181,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   </div>
                   <h3 className="font-bold text-lg text-brand-dark mb-2">Zero Payment Credentials</h3>
                   <p className="text-xs text-brand-gray leading-relaxed font-medium">
-                    We process orders via <strong className="text-brand-dark">Cash on Delivery (COD) & WhatsApp verification</strong>. We never store credit cards or sensitive financial details.
+                    We process orders via <strong className="text-brand-dark">Bank / Wallet transfer & WhatsApp screenshot verification</strong>. We never store credit cards or sensitive financial details.
                   </p>
                 </div>
 
@@ -4990,7 +5205,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                     Information We Collect
                   </h2>
                   <p className="text-sm text-brand-gray leading-relaxed font-medium mb-3">
-                    When you browse our catalog or place an order via WhatsApp or Cash on Delivery, we collect minimal personal details necessary to fulfill your purchases:
+                    When you browse our catalog or place an order via WhatsApp or checkout transfer, we collect minimal personal details necessary to fulfill your purchases:
                   </p>
                   <ul className="space-y-2 text-sm text-brand-gray leading-relaxed pl-2 font-medium">
                     <li className="flex items-start gap-2">
@@ -5124,9 +5339,9 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4">
                     <Truck size={24} />
                   </div>
-                  <h3 className="font-bold text-lg text-brand-dark mb-2">Nationwide COD Delivery</h3>
+                  <h3 className="font-bold text-lg text-brand-dark mb-2">Advance Transfer Dispatch</h3>
                   <p className="text-xs text-brand-gray leading-relaxed font-medium">
-                    We offer Cash on Delivery (COD) across Pakistan. Delivery typically takes 3 to 5 business days depending on city location.
+                    Orders are dispatched upon receiving your payment transfer screenshot via WhatsApp. Delivery typically takes 3 to 5 business days.
                   </p>
                 </div>
 
@@ -5174,7 +5389,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   <ul className="space-y-3 text-sm text-brand-gray leading-relaxed pl-2 font-medium">
                     <li className="flex items-start gap-2">
                       <span className="text-brand-primary font-bold">•</span>
-                      <span><strong>Dispatch Time:</strong> Confirmed orders are processed and handed over to third-party courier services within 24 to 48 hours.</span>
+                      <span><strong>Dispatch Time:</strong> Confirmed orders are processed and handed over to third-party courier services within 24 to 48 hours after payment screenshot verification.</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-brand-primary font-bold">•</span>
@@ -5182,7 +5397,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-brand-primary font-bold">•</span>
-                      <span><strong>Refusal at Doorstep:</strong> Repeated unconfirmed order refusals upon courier delivery may lead to account blacklisting for future Cash on Delivery orders.</span>
+                      <span><strong>Payment Verification:</strong> Orders will only be processed for dispatch once payment confirmation is verified via WhatsApp.</span>
                     </li>
                   </ul>
                 </div>
@@ -5372,10 +5587,10 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
               {cart.length > 0 && (
                 <div className="p-6 border-t bg-brand-light rounded-t-[2.5rem] shadow-xl">
                   {/* Shipping Method Selector */}
-                  <div className="px-1 py-1 bg-brand-dark/[0.04] rounded-xl flex gap-1 border border-black/5 mb-4">
+                  <div className="px-1 py-1 bg-brand-dark/[0.04] rounded-xl flex gap-1 border border-black/5 mb-3">
                     <button
                       onClick={() => setShippingMethod('delivery')}
-                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all focus:outline-none ${
+                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all focus:outline-none cursor-pointer ${
                         shippingMethod === 'delivery' 
                           ? 'bg-white text-brand-dark shadow-sm scale-[1.02] border-black/5 border' 
                           : 'text-brand-gray hover:text-brand-dark'
@@ -5385,7 +5600,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                     </button>
                     <button
                       onClick={() => setShippingMethod('pickup')}
-                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all focus:outline-none ${
+                      className={`flex-1 py-2.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all focus:outline-none cursor-pointer ${
                         shippingMethod === 'pickup' 
                           ? 'bg-white text-brand-dark shadow-sm scale-[1.02] border-black/5 border' 
                           : 'text-brand-gray hover:text-brand-dark'
@@ -5394,6 +5609,53 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                       <MapPin size={14} className={shippingMethod === 'pickup' ? 'text-brand-secondary' : 'text-brand-gray'} /> Self Pickup
                     </button>
                   </div>
+
+                  {/* Destination Country Selector (when Home Delivery is selected) */}
+                  {shippingMethod === 'delivery' && (
+                    <div className="mb-3 p-3 bg-white rounded-2xl border border-black/[0.06] shadow-2xs space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase text-brand-gray tracking-wider">
+                        <span className="flex items-center gap-1">
+                          <Globe size={12} className="text-brand-primary" /> Destination Country
+                        </span>
+                        <span className="text-emerald-700 font-bold text-[9px] bg-emerald-50 px-1.5 py-0.5 rounded">
+                          {shippingCountry === 'Pakistan' ? '🇵🇰 Domestic Dispatch' : '✈️ International Air Express'}
+                        </span>
+                      </div>
+                      <select
+                        value={shippingCountry}
+                        onChange={(e) => setShippingCountry(e.target.value)}
+                        className="w-full bg-brand-light border border-black/10 rounded-xl px-2.5 py-2 text-xs font-bold text-brand-dark outline-none focus:ring-2 focus:ring-brand-primary/20 cursor-pointer"
+                      >
+                        {SHIPPING_COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.name}>
+                            {c.flag} {c.name} {c.isDomestic ? '(Domestic: 2-3 Days)' : '(International: 10-12 Days)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Clear Delivery Timeline Notice Banner */}
+                  {shippingMethod === 'delivery' && (
+                    <div className="p-3.5 bg-gradient-to-br from-emerald-50 via-teal-50/40 to-emerald-50/80 border border-emerald-200/90 rounded-2xl text-emerald-950 text-xs flex items-start gap-2.5 mb-4 shadow-2xs">
+                      <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                        <Clock size={15} />
+                      </div>
+                      <div className="space-y-1 text-left flex-1 min-w-0">
+                        <p className="font-extrabold text-emerald-950 leading-snug text-xs">
+                          Estimated delivery: 2-3 business days in Pakistan and 10-12 working days outside Pakistan internationally selected country
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold pt-0.5">
+                          <span className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-emerald-200 text-zinc-800 shadow-3xs">
+                            📍 Selected: <strong>{shippingCountry}</strong>
+                          </span>
+                          <span className="inline-flex items-center gap-1 bg-emerald-600 text-white px-2 py-0.5 rounded-md font-extrabold shadow-3xs">
+                            ⏱️ {shippingCountry === 'Pakistan' ? '2-3 Business Days' : '10-12 Working Days'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Pricing Breakdown */}
                   <div className="flex flex-col gap-2.5 mb-5 bg-white p-4 rounded-2xl border border-black/[0.04] shadow-sm">
@@ -5416,12 +5678,16 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                       <div className="flex flex-col">
                         <span>Delivery Rate</span>
                         {shippingMethod === 'delivery' && (
-                          <span className="text-[9px] text-brand-gray/60 font-medium normal-case tracking-normal">
-                            {cartTotalWeight <= 500 
-                              ? 'Within 500g (Rs. 250 fee)' 
-                              : cartTotalWeight <= 1000 
-                                ? 'Within 1kg (Rs. 400 fee)' 
-                                : 'Bulk packaging rates apply'}
+                          <span className="text-[9px] text-brand-gray/80 font-medium normal-case tracking-normal">
+                            {shippingCountry === 'Pakistan' ? (
+                              cartTotalWeight <= 500 
+                                ? 'Within 500g (Rs. 250 fee) • 2-3 Business Days' 
+                                : cartTotalWeight <= 1000 
+                                  ? 'Within 1kg (Rs. 400 fee) • 2-3 Business Days' 
+                                  : 'Bulk packaging rates apply • 2-3 Business Days'
+                            ) : (
+                              `Air Express (${shippingCountry}) • 10-12 Working Days`
+                            )}
                           </span>
                         )}
                         {shippingMethod === 'pickup' && (
@@ -5460,7 +5726,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                         setIsCartOpen(false);
                         setIsCheckoutModalOpen(true);
                       }}
-                      className="btn-primary w-full h-14 justify-center text-base shadow-xl shadow-brand-primary/20 gap-3"
+                      className="btn-primary w-full h-14 justify-center text-base shadow-xl shadow-brand-primary/20 gap-3 cursor-pointer"
                     >
                       Proceed to Checkout <ArrowRight size={18} />
                     </button>
@@ -6655,7 +6921,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                           <option value="TCS Express">TCS Express</option>
                           <option value="Leopard Courier">Leopard Courier</option>
                           <option value="Trax Logistics">Trax Logistics</option>
-                          <option value="PostEx COD">PostEx COD</option>
+                          <option value="PostEx">PostEx</option>
                           <option value="CallCourier">CallCourier</option>
                           <option value="M&P Courier">M&P Courier</option>
                         </select>
@@ -6756,7 +7022,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   name: newOrderCustomerName.trim(),
                   emailOrPhone: newOrderPhone.trim(),
                   subject: newOrderSubject.trim() || 'WhatsApp Order',
-                  message: newOrderMessage.trim() || 'WhatsApp order confirmed with Cash on Delivery (COD).',
+                  message: newOrderMessage.trim() || 'WhatsApp order confirmed with bank/wallet transfer verification.',
                   createdAt: nowStr,
                   status: 'replied',
                   orderType: 'WhatsApp Order',
@@ -6829,7 +7095,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   <option value="TCS Express">TCS Express</option>
                   <option value="Leopard Courier">Leopard Courier</option>
                   <option value="Trax Logistics">Trax Logistics</option>
-                  <option value="PostEx COD">PostEx COD</option>
+                  <option value="PostEx">PostEx</option>
                   <option value="CallCourier">CallCourier</option>
                   <option value="M&P Courier">M&P Courier</option>
                 </select>
@@ -6843,7 +7109,7 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
                   rows={3}
                   value={newOrderMessage}
                   onChange={(e) => setNewOrderMessage(e.target.value)}
-                  placeholder="e.g. House #42, Street 5, F-10/2 Islamabad. Total Rs. 3,200 COD."
+                  placeholder="e.g. House #42, Street 5, F-10/2 Islamabad. Total Rs. 3,200 (Payment Screenshot Attached)."
                   className="w-full bg-brand-light border border-black/10 rounded-xl p-3 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-primary/20"
                 />
               </div>
@@ -7274,6 +7540,14 @@ add_filter('template_include', 'kcc_store_override_homepage');`;
         activeWhatsappLink={storeSettings.whatsappNumber ? `https://wa.me/${storeSettings.whatsappNumber.replace(/[^0-9]/g, '')}` : 'https://wa.me/923001234567'}
         onClearCart={() => setCart([])}
         showToast={showToast}
+        storeSettings={storeSettings}
+        onUpdateStoreSettings={(newSettings) => {
+          setStoreSettings(newSettings);
+          localStorage.setItem('kcc_store_settings_v1', JSON.stringify(newSettings));
+        }}
+        isAdmin={isAdminLoggedIn}
+        initialCountry={shippingCountry}
+        initialShippingMethod={shippingMethod}
       />
 
       {/* Bulk Product CSV Upload Modal */}

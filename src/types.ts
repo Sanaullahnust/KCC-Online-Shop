@@ -377,14 +377,14 @@ export const INITIAL_CONTACT_SUBMISSIONS: ContactSubmission[] = [
     name: 'Amina Sheikh',
     emailOrPhone: '0321-8899112',
     subject: 'WhatsApp Order - 2x Water Dispenser Pump',
-    message: 'Confirmed order placed via WhatsApp for 2x Touch Screen Water Pump (Rs. 2,900 total COD).',
+    message: 'Confirmed order placed via WhatsApp for 2x Touch Screen Water Pump (Rs. 2,900 Advance Payment Transfer verified).',
     createdAt: '2026-08-07 10:15',
     status: 'replied',
     orderType: 'WhatsApp Order',
     trackingNumber: 'TCS-928401928',
     courierName: 'TCS Express',
     estimatedDeliveryDate: '2026-08-14',
-    notes: 'Dispatched via TCS COD Express. Customer notified on WhatsApp.'
+    notes: 'Payment screenshot verified on WhatsApp. Dispatched via TCS Express.'
   }
 ];
 
@@ -419,12 +419,30 @@ export interface StoreSettings {
   returnPolicyText: string;
   privacyPolicyText: string;
   termsText: string;
+  bankName?: string;
+  bankAccountTitle?: string;
+  bankAccountNumber?: string;
+  bankIban?: string;
+  bankQr?: string;
+  bankAlHabibTitle?: string;
+  bankAlHabibAccountNumber?: string;
+  bankAlHabibIban?: string;
+  bankAlHabibQr?: string;
+  easypaisaNumber?: string;
+  easypaisaTitle?: string;
+  easypaisaQr?: string;
+  jazzcashNumber?: string;
+  jazzcashTitle?: string;
+  jazzcashQr?: string;
+  raastId?: string;
+  raastQr?: string;
+  paymentInstructions?: string;
 }
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   topBarText: 'All items on Wholesale Price • Store Collection & Delivery • Rs.250 (500g) / Rs.400 (1kg)',
-  storePhone: '03001234567',
-  whatsappNumber: '923001234567',
+  storePhone: '03295147517',
+  whatsappNumber: '923295147517',
   storeAddress: 'KCC Wholesale Shop, Main Bazar, City Center, Pakistan',
   deliveryFee500g: 250,
   deliveryFee1kg: 400,
@@ -434,8 +452,52 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   heroBgImage: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=1200',
   returnPolicyText: 'At KCC Store, we want you to be 100% satisfied with your wholesale purchase. If you receive a damaged or incorrect product, you can request an exchange or return within 7 days of delivery. Please inspect your goods upon store pickup or courier arrival.',
   privacyPolicyText: 'We respect your privacy. KCC Store only collects essential customer information required for shipping, order updates, and customer support. We do not sell or share your personal data with third parties.',
-  termsText: 'By placing an order on KCC Store, you agree to our wholesale terms. Prices are subject to availability. Shipping rates are calculated based on weight (Rs.250 per 500g or Rs.400 per 1kg). Payment is accepted via Cash on Delivery or Advance Bank Deposit.'
+  termsText: 'By placing an order on KCC Store, you agree to our wholesale terms. Prices are subject to availability. Shipping rates are calculated based on weight (Rs.250 per 500g or Rs.400 per 1kg). Payment is accepted strictly via Advance Bank Transfer / EasyPaisa / JazzCash / Raast. Buyers must share their payment transfer screenshot on WhatsApp to confirm and dispatch the order timely.',
+  bankName: 'Meezan Bank Ltd',
+  bankAccountTitle: 'KCC Online Wholesale Shop',
+  bankAccountNumber: '01020105829102',
+  bankIban: 'PK36MEZN0001020105829102',
+  bankQr: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=PK36MEZN0001020105829102&margin=10',
+  bankAlHabibTitle: 'KCC Wholesale Traders',
+  bankAlHabibAccountNumber: '1029-0981-002341-01-9',
+  bankAlHabibIban: 'PK45BAHL1029098100234101',
+  bankAlHabibQr: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=PK45BAHL1029098100234101&margin=10',
+  easypaisaNumber: '03295147517',
+  easypaisaTitle: 'KCC Store',
+  easypaisaQr: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=03295147517-EASYPAISA-KCC&margin=10',
+  jazzcashNumber: '03295147517',
+  jazzcashTitle: 'KCC Store',
+  jazzcashQr: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=03295147517-JAZZCASH-KCC&margin=10',
+  raastId: '03295147517',
+  raastQr: 'https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=03295147517-RAAST-KCC&margin=10',
+  paymentInstructions: 'Please scan the Payment QR Code or transfer to the account details above. Share your payment transaction screenshot on WhatsApp to verify and dispatch your order timely.'
 };
+
+export interface ShippingCountry {
+  code: string;
+  name: string;
+  flag: string;
+  isDomestic: boolean;
+  eta: string;
+  fee500g: number;
+  fee1kg: number;
+  extra500g: number;
+}
+
+export const SHIPPING_COUNTRIES: ShippingCountry[] = [
+  { code: 'PK', name: 'Pakistan', flag: '🇵🇰', isDomestic: true, eta: '2-3 business days in Pakistan', fee500g: 250, fee1kg: 400, extra500g: 150 },
+  { code: 'AE', name: 'United Arab Emirates', flag: '🇦🇪', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 3500, fee1kg: 4800, extra500g: 1200 },
+  { code: 'SA', name: 'Saudi Arabia', flag: '🇸🇦', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 3800, fee1kg: 5200, extra500g: 1300 },
+  { code: 'GB', name: 'United Kingdom', flag: '🇬🇧', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 4500, fee1kg: 6200, extra500g: 1500 },
+  { code: 'US', name: 'United States', flag: '🇺🇸', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 4800, fee1kg: 6800, extra500g: 1600 },
+  { code: 'CA', name: 'Canada', flag: '🇨🇦', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 4900, fee1kg: 6900, extra500g: 1650 },
+  { code: 'AU', name: 'Australia', flag: '🇦🇺', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 5200, fee1kg: 7200, extra500g: 1700 },
+  { code: 'OM', name: 'Oman', flag: '🇴🇲', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 3600, fee1kg: 4900, extra500g: 1250 },
+  { code: 'QA', name: 'Qatar', flag: '🇶🇦', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 3700, fee1kg: 5000, extra500g: 1250 },
+  { code: 'KW', name: 'Kuwait', flag: '🇰🇼', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 3700, fee1kg: 5000, extra500g: 1250 },
+  { code: 'DE', name: 'Germany / Europe', flag: '🇩🇪', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 4600, fee1kg: 6400, extra500g: 1550 },
+  { code: 'INTL', name: 'Other International Country', flag: '🌐', isDomestic: false, eta: '10-12 working days outside Pakistan', fee500g: 5000, fee1kg: 7000, extra500g: 1600 },
+];
 
 export const DEALS: Deal[] = [
   {
@@ -485,11 +547,11 @@ export const DEFAULT_DROPSHIP_SUPPLIERS: DropshipSupplier[] = [
     platform: 'HHC Dropshipping',
     rating: 4.95,
     ordersFulfilled: 120000,
-    avgShippingDays: '2-4 Days Domestic Cash On Delivery (TCS/Trax/Leopards)',
+    avgShippingDays: '2-4 Days Domestic Tracked Dispatch (TCS/Trax/Leopards)',
     badge: 'Verified Pakistani Supplier #1',
     logo: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=200',
     url: 'https://hhcdropshipping.com/',
-    description: 'Premier Pakistani wholesale dropshipping portal offering local COD delivery across 250+ cities, no customs delays, instant PKR pricing, and high-margin trending winning products.'
+    description: 'Premier Pakistani wholesale dropshipping portal offering fast tracked delivery across 250+ cities, instant PKR pricing, and high-margin trending winning products.'
   },
   {
     id: 'sup-1',
@@ -556,7 +618,7 @@ export const DEFAULT_DROPSHIP_PRESETS: DropshipPresetItem[] = [
     category: 'Kitchen',
     weight: 380,
     image: 'https://images.unsplash.com/photo-1585670270608-410a56f8f537?q=80&w=800',
-    shippingMethod: 'Local Pakistan COD (Trax / Leopards / TCS)',
+    shippingMethod: 'Local Pakistan Tracked Dispatch (Trax / Leopards / TCS)',
     description: 'Rechargeable cordless power scrubber with 5 brush heads. Best seller for dishwashing, gas stove grease removal, bathroom tiles, and car seats.'
   },
   {
@@ -573,7 +635,7 @@ export const DEFAULT_DROPSHIP_PRESETS: DropshipPresetItem[] = [
     category: 'Kitchen',
     weight: 180,
     image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?q=80&w=800',
-    shippingMethod: 'Local Pakistan COD (Trax / Leopards / TCS)',
+    shippingMethod: 'Local Pakistan Tracked Dispatch (Trax / Leopards / TCS)',
     description: 'Heat resistant 240°C reusable silicone basket for air fryers and microwaves. Non-stick easy wash design.'
   },
   {

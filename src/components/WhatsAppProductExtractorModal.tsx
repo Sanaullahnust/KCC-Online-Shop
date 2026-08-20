@@ -147,7 +147,7 @@ Market Selling: Rs 1650 to 1850
 Weight: 350 grams
 Picture: https://images.unsplash.com/photo-1590212151175-e58edd96185c?q=80&w=800
 
-Delivery all over Pakistan via Trax / Leopards COD.`
+Delivery all over Pakistan via Trax / Leopards with payment screenshot confirmation.`
   }
 ];
 

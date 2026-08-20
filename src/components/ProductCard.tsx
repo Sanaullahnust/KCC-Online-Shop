@@ -206,7 +206,7 @@ export function ProductCard({
             )}
           </div>
           <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-            <Truck size={11} /> COD Available
+            <Truck size={11} /> Fast Dispatch
           </div>
         </div>
       </div>

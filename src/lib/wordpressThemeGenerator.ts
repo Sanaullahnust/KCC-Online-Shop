@@ -112,7 +112,7 @@ Theme Name: ${themeName}
 Theme URI: ${authorUri}
 Author: ${author}
 Author URI: ${authorUri}
-Description: Complete, modern eCommerce and Wholesale Storefront WordPress Theme with direct WhatsApp ordering, responsive product catalog, interactive cart, simulated courier tracking generator, and instant cash-on-delivery checkout.
+Description: Complete, modern eCommerce and Wholesale Storefront WordPress Theme with direct WhatsApp ordering, responsive product catalog, interactive cart, simulated courier tracking generator, and advance transfer verification.
 Version: ${version}
 Requires at least: 5.8
 Tested up to: 6.7
@@ -651,7 +651,7 @@ $fee_1kg = (int) get_option('kcc_fee_1kg', isset($settings['deliveryFee1kg']) ? 
             <div class="hidden lg:block w-72 h-72 rounded-3xl bg-[#c5a880]/10 border border-white/10 p-6 backdrop-blur-md text-center space-y-3">
                 <div class="text-4xl">📦</div>
                 <h3 class="text-lg font-bold">Fast Courier Delivery</h3>
-                <p class="text-xs text-zinc-400">Cash on Delivery across Pakistan. Safe packaging and wholesale discounts on bulk quantities.</p>
+                <p class="text-xs text-zinc-400">Tracked shipping across Pakistan. Safe packaging and wholesale discounts on bulk quantities.</p>
                 <div class="pt-2 text-xs font-mono text-[#c5a880]">500g: Rs.<?php echo esc_html($fee_500); ?> | 1kg+: Rs.<?php echo esc_html($fee_1kg); ?></div>
             </div>
         </div>
@@ -764,7 +764,7 @@ $fee_1kg = (int) get_option('kcc_fee_1kg', isset($settings['deliveryFee1kg']) ? 
                 <div class="bg-white p-6 rounded-3xl border border-black/5 text-left space-y-2 shadow-xs">
                     <div class="text-2xl">🚚</div>
                     <h4 class="font-bold text-sm text-zinc-900">Fast Nationwide Shipping</h4>
-                    <p class="text-xs text-zinc-500">TCS, Leopards, and Trax Cash on Delivery dispatches with live tracking numbers.</p>
+                    <p class="text-xs text-zinc-500">TCS, Leopards, and Trax couriers with verified payment dispatch and live tracking numbers.</p>
                 </div>
                 <div class="bg-white p-6 rounded-3xl border border-black/5 text-left space-y-2 shadow-xs">
                     <div class="text-2xl">🔄</div>
@@ -791,8 +791,8 @@ $fee_1kg = (int) get_option('kcc_fee_1kg', isset($settings['deliveryFee1kg']) ? 
             </div>
             <div class="space-y-2">
                 <h4 class="text-base font-bold text-white">Payment & Delivery</h4>
-                <p>💵 Cash on Delivery (COD) across Pakistan</p>
-                <p>💳 Advance Bank Transfer / JazzCash / EasyPaisa</p>
+                <p>💳 Advance Transfer (Bank / JazzCash / EasyPaisa / Raast)</p>
+                <p>📲 Send Payment Screenshot on WhatsApp for Instant Dispatch</p>
                 <p>📦 Delivery rates: Rs.<?php echo esc_html($fee_500); ?> (500g) / Rs.<?php echo esc_html($fee_1kg); ?> (1kg+)</p>
             </div>
         </div>
@@ -1093,13 +1093,13 @@ get_footer();
                             <span class="font-bold text-zinc-900">Rs. \${shippingFee}</span>
                         </div>
                         <div class="flex justify-between text-sm font-black text-zinc-900 border-t pt-2">
-                            <span>Total (COD):</span>
+                            <span>Total Payable:</span>
                             <span class="text-emerald-700">Rs. \${total.toLocaleString()}</span>
                         </div>
 
                         <div class="pt-3 flex gap-2">
                             <button id="kcc-whatsapp-checkout-btn" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-2xl shadow-md cursor-pointer flex items-center justify-center gap-1.5">
-                                💬 Checkout on WhatsApp
+                                💬 Order & Confirm via WhatsApp
                             </button>
                         </div>
                     </div>
@@ -1135,14 +1135,14 @@ get_footer();
         const waCheckout = document.getElementById('kcc-whatsapp-checkout-btn');
         if (waCheckout) {
             waCheckout.addEventListener('click', () => {
-                let msg = 'AOA! I want to place a Cash on Delivery order from KCC Store:\\n\\n';
+                let msg = 'AOA! I want to place an order from KCC Store:\\n\\n';
                 cart.forEach((item, i) => {
                     msg += (i + 1) + '. ' + item.name + ' (Qty: ' + item.quantity + ') - Rs. ' + (item.price * item.quantity) + '\\n';
                 });
                 msg += '\\nTotal Items: ' + cart.reduce((s, i) => s + i.quantity, 0);
                 msg += '\\nEst. Weight: ' + totalWeight + 'g';
                 msg += '\\nDelivery Fee: Rs. ' + shippingFee;
-                msg += '\\n*Grand Total: Rs. ' + total.toLocaleString() + ' COD*\\n\\nPlease confirm my dispatch address and courier details!';
+                msg += '\\n*Grand Total: Rs. ' + total.toLocaleString() + '*\\n\\nI will share my payment transfer screenshot on WhatsApp for immediate dispatch confirmation!';
                 
                 window.open('https://wa.me/' + whatsappNumber + '?text=' + encodeURIComponent(msg), '_blank');
                 modal.remove();
@@ -1261,7 +1261,7 @@ ${themeName} is a high-performance, responsive WordPress theme tailored specific
 
 KEY FEATURES:
 * Zero-Configuration Server-Side HTML Rendering (Guaranteed No Blank Screen)
-* Direct 1-Click WhatsApp Ordering & Cash-on-Delivery (COD) Checkout
+* Direct 1-Click WhatsApp Ordering with Payment Screenshot Confirmation
 * Interactive Responsive Product Catalog with Instant Search & Category Filters
 * Weight-Based Shipping Calculation (500g vs 1kg+ rates)
 * Simulated Tracking Number Generator for TCS / Leopards / Trax

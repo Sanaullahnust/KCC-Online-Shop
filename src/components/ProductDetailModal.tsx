@@ -84,7 +84,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       name: 'Ayesha Malik',
       rating: 5,
       date: '1 week ago',
-      comment: 'Super fast Cash on Delivery dispatch. Product is exactly as described in images.',
+      comment: 'Super fast dispatch upon transfer confirmation. Product is exactly as described in images.',
       verified: true
     },
     {
@@ -280,7 +280,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="p-3 rounded-2xl bg-brand-light/60 border border-black/5 flex items-center gap-2.5">
                   <Truck size={20} className="text-brand-primary shrink-0" />
                   <div>
-                    <h5 className="text-[11px] font-bold text-brand-dark">Cash On Delivery</h5>
+                    <h5 className="text-[11px] font-bold text-brand-dark">Tracked Courier</h5>
                     <p className="text-[10px] text-brand-gray">All Pakistan Dispatch</p>
                   </div>
                 </div>
@@ -342,7 +342,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.2 rounded-full uppercase">Only {stockInfo.stock} Left</span>
                     </h4>
                     <p className="text-xs text-amber-800 mt-0.5 leading-snug">
-                      High demand for this item! Place your Cash on Delivery order now before our warehouse inventory sells out.
+                      High demand for this item! Place your order and confirm your transfer now before warehouse inventory sells out.
                     </p>
                   </div>
                 </div>
@@ -692,7 +692,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="space-y-3">
                   <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-100 text-blue-900 space-y-1">
                     <strong className="block font-bold">1. Delivery Timeframe</strong>
-                    <p>Islamabad / Rawalpindi orders delivered within 24-48 hours. Major cities across Pakistan delivered in 2-4 business days via courier.</p>
+                    <p>Estimated delivery: 2-3 business days in Pakistan and 10-12 working days outside Pakistan internationally selected country.</p>
                   </div>
                   <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-100 text-emerald-900 space-y-1">
                     <strong className="block font-bold">2. Defect Replacement Guarantee</strong>

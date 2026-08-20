@@ -1,7 +1,8 @@
 import { useState, FormEvent } from 'react';
-import { X, ShoppingBag, Truck, MapPin, CheckCircle, CreditCard, ArrowRight, Sparkles, AlertCircle, Building, Phone, User, ShieldCheck, Tag, AlertTriangle } from 'lucide-react';
-import { Product, getProductStockStatus } from '../types';
+import { X, ShoppingBag, Truck, MapPin, CheckCircle, CreditCard, ArrowRight, Sparkles, AlertCircle, Building, Phone, User, ShieldCheck, Tag, AlertTriangle, Copy, Check, Image as ImageIcon, Globe, Clock, QrCode } from 'lucide-react';
+import { Product, getProductStockStatus, StoreSettings, SHIPPING_COUNTRIES, ShippingCountry } from '../types';
 import { ProductVariant, getCheckoutUrl, createCart, getCommerceConfigStatus } from '../lib/commerceApi';
+import { PaymentQrCodeSection } from './PaymentQrCodeSection';
 
 export interface CartEntry {
   product: Product;
@@ -16,6 +17,11 @@ interface CheckoutModalProps {
   activeWhatsappLink: string;
   onClearCart: () => void;
   showToast: (message: string, type: 'success' | 'info' | 'remove') => void;
+  storeSettings?: StoreSettings;
+  onUpdateStoreSettings?: (newSettings: StoreSettings) => void;
+  isAdmin?: boolean;
+  initialCountry?: string;
+  initialShippingMethod?: 'delivery' | 'pickup';
 }
 
 export function CheckoutModal({
@@ -25,9 +31,16 @@ export function CheckoutModal({
   activeWhatsappLink,
   onClearCart,
   showToast,
+  storeSettings,
+  onUpdateStoreSettings,
+  isAdmin = true,
+  initialCountry = 'Pakistan',
+  initialShippingMethod = 'delivery'
 }: CheckoutModalProps) {
-  const [shippingMethod, setShippingMethod] = useState<'delivery' | 'pickup'>('delivery');
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'bank' | 'shopify'>('cod');
+  const [shippingMethod, setShippingMethod] = useState<'delivery' | 'pickup'>(initialShippingMethod);
+  const [shippingCountry, setShippingCountry] = useState<string>(initialCountry);
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'shopify'>('bank');
+  const [paymentViewTab, setPaymentViewTab] = useState<'qr' | 'manual'>('qr');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
@@ -40,8 +53,27 @@ export function CheckoutModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  // Account details resolution
+  const bankName = storeSettings?.bankName || 'Meezan Bank Ltd / Bank Alfalah';
+  const accountTitle = storeSettings?.bankAccountTitle || 'KCC Online Wholesale Shop';
+  const accountNumber = storeSettings?.bankAccountNumber || '01020105829102';
+  const iban = storeSettings?.bankIban || 'PK36MEZN0001020105829102';
+  const easypaisaNumber = storeSettings?.easypaisaNumber || storeSettings?.storePhone || '03295147517';
+  const easypaisaTitle = storeSettings?.easypaisaTitle || 'KCC Store';
+  const jazzcashNumber = storeSettings?.jazzcashNumber || storeSettings?.storePhone || '03295147517';
+  const jazzcashTitle = storeSettings?.jazzcashTitle || 'KCC Store';
+  const raastId = storeSettings?.raastId || storeSettings?.storePhone || '03295147517';
+
+  const copyToClipboard = (text: string, label: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    showToast(`${label} copied to clipboard!`, 'success');
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
 
   // Items Subtotal calculation
   const itemsSubtotal = cart.reduce((acc, item) => {
@@ -56,13 +88,26 @@ export function CheckoutModal({
 
   // Delivery Charge computation
   let deliveryCharge = 0;
+  const countryData = SHIPPING_COUNTRIES.find(c => c.name === shippingCountry) || SHIPPING_COUNTRIES[0];
   if (shippingMethod === 'delivery' && !appliedCoupon?.isFreeShipping) {
-    if (totalWeightGrams <= 500) {
-      deliveryCharge = 250;
-    } else if (totalWeightGrams <= 1000) {
-      deliveryCharge = 400;
+    if (countryData.isDomestic) {
+      const fee500g = storeSettings?.deliveryFee500g || countryData.fee500g || 250;
+      const fee1kg = storeSettings?.deliveryFee1kg || countryData.fee1kg || 400;
+      if (totalWeightGrams <= 500) {
+        deliveryCharge = fee500g;
+      } else if (totalWeightGrams <= 1000) {
+        deliveryCharge = fee1kg;
+      } else {
+        deliveryCharge = fee1kg + Math.ceil((totalWeightGrams - 1000) / 500) * (countryData.extra500g || 150);
+      }
     } else {
-      deliveryCharge = 400 + Math.ceil((totalWeightGrams - 1000) / 500) * 150;
+      if (totalWeightGrams <= 500) {
+        deliveryCharge = countryData.fee500g;
+      } else if (totalWeightGrams <= 1000) {
+        deliveryCharge = countryData.fee1kg;
+      } else {
+        deliveryCharge = countryData.fee1kg + Math.ceil((totalWeightGrams - 1000) / 500) * countryData.extra500g;
+      }
     }
   }
 
@@ -131,7 +176,7 @@ export function CheckoutModal({
           setOrderSuccess(true);
           showToast('Shopify Storefront Checkout Created!', 'success');
         } else {
-          showToast('Falling back to direct WhatsApp Order Confirmation.', 'info');
+          showToast('Order details verified! Please share transfer screenshot on WhatsApp.', 'info');
           setOrderSuccess(true);
         }
       } catch (err) {
@@ -141,12 +186,12 @@ export function CheckoutModal({
         setIsSubmitting(false);
       }
     } else {
-      // Direct COD or Bank Transfer confirmation
+      // Direct Bank Transfer / Mobile Wallet confirmation
       setTimeout(() => {
         setIsSubmitting(false);
         setOrderSuccess(true);
-        showToast('Order details verified! Click to confirm on WhatsApp.', 'success');
-      }, 600);
+        showToast('Order created! Please share your payment screenshot on WhatsApp.', 'success');
+      }, 500);
     }
   };
 
@@ -155,12 +200,16 @@ export function CheckoutModal({
     msg += `*Customer Details:*\n`;
     msg += `• Name: ${name}\n`;
     msg += `• Phone: ${phone}\n`;
-    msg += `• Shipping Method: ${shippingMethod === 'delivery' ? 'Home Courier Delivery' : 'Self Store Pickup'}\n`;
+    msg += `• Shipping Method: ${shippingMethod === 'delivery' ? `Home Courier Delivery (${shippingCountry})` : 'Self Store Pickup'}\n`;
     if (shippingMethod === 'delivery') {
+      msg += `• Destination Country: ${shippingCountry}\n`;
       msg += `• City: ${city}\n`;
       msg += `• Delivery Address: ${address}\n`;
+      msg += `• Estimated Delivery: ${shippingCountry === 'Pakistan' ? '2-3 business days in Pakistan' : `10-12 working days outside Pakistan internationally selected country (${shippingCountry})`}\n`;
     }
-    msg += `• Payment Method: ${paymentMethod === 'cod' ? 'Cash on Delivery (COD)' : paymentMethod === 'bank' ? 'Bank Transfer' : 'Online Storefront'}\n`;
+    msg += `• Payment Method: Advance Payment Transfer (Bank / EasyPaisa / JazzCash / Raast)\n`;
+    msg += `• Payment Status: Transfer Completed\n`;
+    msg += `📸 *Payment Screenshot:* [Attached below in this WhatsApp chat for immediate verification]\n`;
     if (notes.trim()) {
       msg += `• Customer Notes: ${notes}\n`;
     }
@@ -178,9 +227,9 @@ export function CheckoutModal({
     if (discountAmount > 0) {
       msg += `Coupon Discount (${appliedCoupon?.code}): -Rs.${discountAmount.toLocaleString()}\n`;
     }
-    msg += `Postage/Delivery Fee: Rs.${deliveryCharge.toLocaleString()}\n`;
-    msg += `*Grand Total Payable: Rs.${grandTotal.toLocaleString()}*\n\n`;
-    msg += `Please confirm my order dispatch. Thank you!`;
+    msg += `Postage/Delivery Fee: Rs.${deliveryCharge.toLocaleString()} (${shippingCountry})\n`;
+    msg += `*Grand Total Paid: Rs.${grandTotal.toLocaleString()}*\n\n`;
+    msg += `Kindly verify my payment transfer screenshot and dispatch the order timely. Thank you!`;
 
     return `${activeWhatsappLink}?text=${encodeURIComponent(msg)}`;
   };
@@ -207,16 +256,33 @@ export function CheckoutModal({
 
         {orderSuccess ? (
           /* Success Screen */
-          <div className="p-8 space-y-6 text-center">
+          <div className="p-6 md:p-8 space-y-6 text-center max-h-[80vh] overflow-y-auto">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-md">
               <CheckCircle size={36} />
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-2xl font-display font-black text-brand-dark">Order Verification Ready!</h3>
-              <p className="text-xs text-brand-gray max-w-md mx-auto leading-relaxed">
-                Thank you, <strong>{name}</strong>! Click below to send your structured order details to KCC Support on WhatsApp for instant confirmation and dispatch.
+              <h3 className="text-2xl font-display font-black text-brand-dark">Order Ready! Share Screenshot on WhatsApp</h3>
+              <p className="text-xs text-brand-gray max-w-lg mx-auto leading-relaxed">
+                Thank you, <strong>{name}</strong>! Your order has been registered for <strong>Rs.{grandTotal.toLocaleString()}</strong>.
+                To confirm payment and ensure <span className="text-emerald-700 font-bold">timely parcel dispatch</span>, please transfer the total amount and share your payment transfer screenshot in our WhatsApp chat.
               </p>
+            </div>
+
+            {/* Payment & QR Codes in Success Screen */}
+            <div className="space-y-3">
+              <PaymentQrCodeSection 
+                storeSettings={storeSettings}
+                payableAmount={grandTotal}
+                onUpdateStoreSettings={onUpdateStoreSettings}
+                isAdmin={isAdmin}
+                showToast={showToast}
+              />
+
+              <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-amber-900 text-xs font-medium flex items-start gap-2.5 text-left">
+                <ImageIcon size={18} className="text-amber-700 shrink-0 mt-0.5" />
+                <span><strong>Step 2 (Dispatch Verification):</strong> Scan the QR code or transfer to any account above. Then click the WhatsApp button below to attach your payment receipt / screenshot. Your parcel will be verified and dispatched timely!</span>
+              </div>
             </div>
 
             {generatedUrl && (
@@ -242,9 +308,9 @@ export function CheckoutModal({
                   onClearCart();
                   onClose();
                 }}
-                className="btn-primary py-4 text-sm font-extrabold justify-center bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 gap-2 cursor-pointer"
+                className="btn-primary py-4 text-sm font-extrabold justify-center bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20 gap-2 cursor-pointer text-white"
               >
-                Confirm & Send Order via WhatsApp <ArrowRight size={18} />
+                Send Order & Share Screenshot on WhatsApp 📸 <ArrowRight size={18} />
               </a>
 
               <button
@@ -252,7 +318,7 @@ export function CheckoutModal({
                   onClearCart();
                   onClose();
                 }}
-                className="py-3 text-xs font-bold text-brand-gray hover:text-brand-dark uppercase tracking-wider"
+                className="py-3 text-xs font-bold text-brand-gray hover:text-brand-dark uppercase tracking-wider cursor-pointer"
               >
                 Close Window
               </button>
@@ -335,6 +401,48 @@ export function CheckoutModal({
                   <MapPin size={16} /> Store Self Pickup (Free)
                 </button>
               </div>
+
+              {shippingMethod === 'delivery' && (
+                <div className="mt-3 space-y-2">
+                  <div className="p-3 bg-white rounded-2xl border border-black/10 flex items-center gap-2.5">
+                    <Globe size={16} className="text-brand-primary shrink-0" />
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold uppercase text-brand-gray mb-0.5">Destination Country</label>
+                      <select
+                        value={shippingCountry}
+                        onChange={(e) => setShippingCountry(e.target.value)}
+                        className="w-full bg-transparent text-xs font-bold text-brand-dark outline-none cursor-pointer"
+                      >
+                        {SHIPPING_COUNTRIES.map((c) => (
+                          <option key={c.code} value={c.name}>
+                            {c.flag} {c.name} {c.isDomestic ? '(Pakistan Domestic: 2-3 Days)' : '(International Express: 10-12 Days)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Clear Delivery Timeline Notice Banner */}
+                  <div className="p-3.5 bg-gradient-to-br from-emerald-50 to-teal-50/50 border border-emerald-200/90 rounded-2xl text-emerald-950 text-xs flex items-start gap-2.5 shadow-2xs">
+                    <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                      <Clock size={15} />
+                    </div>
+                    <div className="space-y-1 text-left flex-1 min-w-0">
+                      <p className="font-extrabold text-emerald-950 leading-snug">
+                        Estimated delivery: 2-3 business days in Pakistan and 10-12 working days outside Pakistan internationally selected country
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold pt-0.5">
+                        <span className="inline-flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-emerald-200 text-zinc-800">
+                          📍 Selected: <strong>{shippingCountry}</strong>
+                        </span>
+                        <span className="inline-flex items-center gap-1 bg-emerald-600 text-white px-2 py-0.5 rounded-md font-extrabold">
+                          ⏱️ {shippingCountry === 'Pakistan' ? '2-3 Business Days' : '10-12 Working Days'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Customer Shipping Form */}
@@ -432,56 +540,209 @@ export function CheckoutModal({
             </div>
 
             {/* Payment Method Selector */}
-            <div>
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-brand-dark mb-2">
-                3. Payment Method
+            <div className="space-y-3">
+              <label className="block text-xs font-extrabold uppercase tracking-wider text-brand-dark">
+                3. Payment Method & Verification
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('cod')}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex flex-col items-start gap-1 transition-all cursor-pointer ${
-                    paymentMethod === 'cod'
-                      ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm ring-1 ring-brand-primary'
-                      : 'bg-white border-black/10 text-brand-gray hover:bg-brand-light'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 font-extrabold">
-                    <Truck size={14} /> Cash on Delivery
-                  </div>
-                  <span className="text-[10px] font-normal text-brand-gray">Pay upon delivery</span>
-                </button>
-
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('bank')}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex flex-col items-start gap-1 transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-2xl border text-xs font-bold flex flex-col items-start gap-1 transition-all cursor-pointer ${
                     paymentMethod === 'bank'
-                      ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm ring-1 ring-brand-primary'
+                      ? 'bg-emerald-50/80 border-emerald-500 text-emerald-950 shadow-sm ring-2 ring-emerald-500/20'
                       : 'bg-white border-black/10 text-brand-gray hover:bg-brand-light'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 font-extrabold">
-                    <Building size={14} /> Bank Transfer / EasyPaisa
+                  <div className="flex items-center gap-1.5 font-extrabold text-emerald-900">
+                    <Building size={16} className="text-emerald-600" /> Advance Bank / Digital Transfer
                   </div>
-                  <span className="text-[10px] font-normal text-brand-gray">Direct account transfer</span>
+                  <span className="text-[10px] font-normal text-emerald-700">Meezan Bank, EasyPaisa, JazzCash, Raast</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setPaymentMethod('shopify')}
-                  className={`p-3 rounded-2xl border text-xs font-bold flex flex-col items-start gap-1 transition-all cursor-pointer ${
+                  className={`p-3.5 rounded-2xl border text-xs font-bold flex flex-col items-start gap-1 transition-all cursor-pointer ${
                     paymentMethod === 'shopify'
-                      ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm ring-1 ring-brand-primary'
+                      ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-sm ring-2 ring-brand-primary/20'
                       : 'bg-white border-black/10 text-brand-gray hover:bg-brand-light'
                   }`}
                 >
                   <div className="flex items-center gap-1.5 font-extrabold">
-                    <CreditCard size={14} /> Online Checkout
+                    <CreditCard size={16} /> Online Checkout
                   </div>
                   <span className="text-[10px] font-normal text-brand-gray">Shopify Storefront API</span>
                 </button>
               </div>
+
+              {/* Bank Accounts & QR Codes when Bank Transfer is selected */}
+              {paymentMethod === 'bank' && (
+                <div className="space-y-3">
+                  {/* View switch tabs */}
+                  <div className="flex items-center justify-between bg-zinc-100 p-1 rounded-xl border border-black/5">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentViewTab('qr')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        paymentViewTab === 'qr'
+                          ? 'bg-white text-emerald-900 shadow-xs font-extrabold'
+                          : 'text-zinc-600 hover:text-zinc-900'
+                      }`}
+                    >
+                      <QrCode size={14} className="text-emerald-600" />
+                      <span>Scan Payment QR Codes</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPaymentViewTab('manual')}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                        paymentViewTab === 'manual'
+                          ? 'bg-white text-zinc-900 shadow-xs font-extrabold'
+                          : 'text-zinc-600 hover:text-zinc-900'
+                      }`}
+                    >
+                      <Building size={14} className="text-zinc-600" />
+                      <span>Account Digits & IBAN</span>
+                    </button>
+                  </div>
+
+                  {paymentViewTab === 'qr' ? (
+                    <PaymentQrCodeSection 
+                      storeSettings={storeSettings}
+                      payableAmount={grandTotal}
+                      onUpdateStoreSettings={onUpdateStoreSettings}
+                      isAdmin={isAdmin}
+                      showToast={showToast}
+                    />
+                  ) : (
+                    <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+                        <span className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                          <Building size={14} className="text-emerald-700" /> Official Bank & Wallet Accounts
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                          Amount: Rs.{grandTotal.toLocaleString()}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        {/* Bank Al Habib info */}
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100 space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-brand-gray uppercase">
+                            <span>Bank AL Habib</span>
+                            <span className="text-blue-700 font-extrabold">Bank</span>
+                          </div>
+                          <p className="font-bold text-brand-dark text-xs">{storeSettings?.bankAlHabibTitle || 'KCC Wholesale Traders'}</p>
+                          <div className="flex items-center justify-between font-mono font-bold text-blue-700 pt-0.5">
+                            <span className="text-xs">Acc: {storeSettings?.bankAlHabibAccountNumber || '1029-0981-002341-01-9'}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(storeSettings?.bankAlHabibAccountNumber || '1029-0981-002341-01-9', 'Bank AL Habib Account Number', 'form_bahl')}
+                              className="p-1 hover:bg-blue-50 rounded text-brand-gray hover:text-blue-700 transition-colors"
+                              title="Copy Bank AL Habib Account"
+                            >
+                              {copiedKey === 'form_bahl' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between font-mono text-[10px] text-zinc-600">
+                            <span className="truncate pr-1">IBAN: {storeSettings?.bankAlHabibIban || 'PK45BAHL1029098100234101'}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(storeSettings?.bankAlHabibIban || 'PK45BAHL1029098100234101', 'Bank AL Habib IBAN', 'form_bahliban')}
+                              className="p-1 hover:bg-blue-50 rounded text-brand-gray hover:text-blue-700 transition-colors"
+                              title="Copy Bank AL Habib IBAN"
+                            >
+                              {copiedKey === 'form_bahliban' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Meezan Bank info */}
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100 space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-brand-gray uppercase">
+                            <span>{bankName}</span>
+                            <span className="text-emerald-700 font-extrabold">Bank</span>
+                          </div>
+                          <p className="font-bold text-brand-dark text-xs">{accountTitle}</p>
+                          <div className="flex items-center justify-between font-mono font-bold text-emerald-700 pt-0.5">
+                            <span className="text-xs">Acc: {accountNumber}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(accountNumber, 'Account Number', 'form_acc')}
+                              className="p-1 hover:bg-emerald-50 rounded text-brand-gray hover:text-emerald-700 transition-colors"
+                              title="Copy Account Number"
+                            >
+                              {copiedKey === 'form_acc' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between font-mono text-[10px] text-zinc-600">
+                            <span className="truncate pr-1">IBAN: {iban}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(iban, 'IBAN', 'form_iban')}
+                              className="p-1 hover:bg-emerald-50 rounded text-brand-gray hover:text-emerald-700 transition-colors"
+                              title="Copy IBAN"
+                            >
+                              {copiedKey === 'form_iban' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Mobile Wallet Easypaisa */}
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100 space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-brand-gray uppercase">
+                            <span>EasyPaisa</span>
+                            <span className="text-emerald-700 font-extrabold">Wallet</span>
+                          </div>
+                          <p className="font-bold text-brand-dark text-xs">{easypaisaTitle}</p>
+                          <div className="flex items-center justify-between font-mono font-bold text-emerald-700 pt-0.5">
+                            <span className="text-xs">{easypaisaNumber}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(easypaisaNumber, 'EasyPaisa Number', 'form_ep')}
+                              className="p-1 hover:bg-emerald-50 rounded text-brand-gray hover:text-emerald-700 transition-colors"
+                              title="Copy EasyPaisa Number"
+                            >
+                              {copiedKey === 'form_ep' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Mobile Wallet JazzCash & Raast */}
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-100 space-y-1">
+                          <div className="flex justify-between items-center text-[10px] font-bold text-brand-gray uppercase">
+                            <span>JazzCash & Raast</span>
+                            <span className="text-red-700 font-extrabold">Wallet</span>
+                          </div>
+                          <p className="font-bold text-brand-dark text-xs">{jazzcashTitle}</p>
+                          <div className="flex items-center justify-between font-mono font-bold text-red-700 pt-0.5">
+                            <span className="text-xs">{jazzcashNumber}</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(jazzcashNumber, 'JazzCash Number', 'form_jc')}
+                              className="p-1 hover:bg-red-50 rounded text-brand-gray hover:text-red-700 transition-colors"
+                              title="Copy JazzCash Number"
+                            >
+                              {copiedKey === 'form_jc' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-brand-gray">Raast ID: <strong className="font-mono text-brand-dark">{raastId}</strong></p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Screenshot requirement warning banner */}
+                  <div className="p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl text-amber-900 text-xs flex items-start gap-2.5 leading-relaxed">
+                    <ImageIcon size={17} className="text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block font-bold text-amber-950 mb-0.5">📸 WhatsApp Payment Screenshot Required for Dispatch:</strong>
+                      Please complete your payment transfer by scanning the QR code or copying the account details above, and share the screenshot in the WhatsApp chat after placing the order. Your order will be packed and dispatched timely upon verification.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Summary Breakdown Box */}
@@ -497,7 +758,7 @@ export function CheckoutModal({
               {discountAmount > 0 && (
                 <div className="flex justify-between text-emerald-600 font-bold">
                   <span>Coupon Discount:</span>
-                  <span className="font-mono">-Rs.{discountAmount.toLocaleString()}</span>
+                  <span className="font-mono">-Rs.${discountAmount.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between text-brand-gray">

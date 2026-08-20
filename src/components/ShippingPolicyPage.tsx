@@ -26,9 +26,9 @@ export function ShippingPolicyPage() {
             <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 text-brand-primary flex items-center justify-center mb-4">
               <Clock size={24} />
             </div>
-            <h3 className="font-bold text-lg text-brand-dark mb-2">3 to 5 Business Days</h3>
+            <h3 className="font-bold text-lg text-brand-dark mb-2">2-3 Days PK / 10-12 Days Intl</h3>
             <p className="text-xs text-brand-gray leading-relaxed font-medium">
-              Standard door-to-door delivery takes <strong className="text-brand-dark">3 to 5 business days</strong> nationwide after order verification via WhatsApp call.
+              Estimated delivery: <strong className="text-brand-dark">2-3 business days in Pakistan</strong> and <strong className="text-brand-dark">10-12 working days outside Pakistan internationally selected country</strong>.
             </p>
           </div>
 
@@ -36,9 +36,9 @@ export function ShippingPolicyPage() {
             <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4">
               <ShieldCheck size={24} />
             </div>
-            <h3 className="font-bold text-lg text-brand-dark mb-2">Cash on Delivery (COD)</h3>
+            <h3 className="font-bold text-lg text-brand-dark mb-2">Advance Transfer Dispatch</h3>
             <p className="text-xs text-brand-gray leading-relaxed font-medium">
-              Pay safely when your parcel arrives at your doorstep. We partner with Leopard, Trax, and TCS couriers.
+              Convenient Bank, EasyPaisa, JazzCash & Raast transfers. Share payment screenshot on WhatsApp for swift dispatch via Leopard, Trax, and TCS couriers.
             </p>
           </div>
 

@@ -66,7 +66,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     icon: '🚚',
     badge: 'Dispatched / In-Transit',
     badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-    text: `Assalam-o-Alaikum {name}! 🚚\n\nYour KCC Shop order *"{subject}"* has been dispatched via *{courier}*.\n\n📦 *Tracking Number:* {trackingNumber}\n📅 *Estimated Delivery:* {deliveryDate}\n\nPlease keep the Cash on Delivery (COD) payment ready. Our courier rider will contact you prior to delivery.\n\nThank you for choosing KCC Store! If you need any assistance, reply to this message.`
+    text: `Assalam-o-Alaikum {name}! 🚚\n\nYour KCC Shop order *"{subject}"* has been dispatched via *{courier}*.\n\n📦 *Tracking Number:* {trackingNumber}\n📅 *Estimated Delivery:* {deliveryDate}\n\nYour payment transfer has been verified and your parcel is safely on its way. Our courier rider will contact you upon arrival.\n\nThank you for choosing KCC Store! If you need any assistance, reply to this message.`
   },
   {
     id: 'tpl_out_for_delivery',
@@ -75,7 +75,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     icon: '🛵',
     badge: 'Rider Out for Delivery',
     badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-    text: `Assalam-o-Alaikum {name}! 🛵\n\nGreat news! Your parcel for *"{subject}"* is *out for delivery today* with our courier rider.\n\n📦 *Courier:* {courier} (Tracking: {trackingNumber})\n\nPlease ensure someone is available at your delivery address to receive the parcel and hand over the COD amount. Thank you!`
+    text: `Assalam-o-Alaikum {name}! 🛵\n\nGreat news! Your parcel for *"{subject}"* is *out for delivery today* with our courier rider.\n\n📦 *Courier:* {courier} (Tracking: {trackingNumber})\n\nPlease ensure someone is available at your delivery address to receive the parcel. Thank you!`
   },
   {
     id: 'tpl_replied_inquiry',
